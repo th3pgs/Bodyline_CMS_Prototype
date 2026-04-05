@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function goHome() {
+    currentAsset = null; // FIX: Wipe memory when returning home
     document.getElementById('view-asset').classList.add('hidden');
     document.getElementById('view-admin').classList.add('hidden');
     document.getElementById('main-header').classList.remove('hidden');
@@ -259,10 +260,13 @@ function showSuccessScreen(title) {
 function clearTimerAndStay() { clearInterval(window.redirectTimer); closeVerifyModal(); selectPattern(currentAsset.PatternID); }
 function executeRedirect() { clearInterval(window.redirectTimer); closeVerifyModal(); goHome(); }
 function openQuickScan() {
+    currentAsset = null; // FIX: Force scanner to act as a locator, not an action
     vState = { flow: null, empScanned: null, isDelegate: false };
     document.getElementById('modal-title').innerText = "Quick Locate Asset";
     document.getElementById('step-1-indicator').parentElement.classList.add('hidden');
-    const m = document.getElementById('verify-modal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('opacity-0'), 10);
+    const m = document.getElementById('verify-modal'); 
+    m.classList.remove('hidden'); 
+    setTimeout(() => m.classList.remove('opacity-0'), 10);
     triggerCameraForStep("Scan physical Pattern QR", handlePatternScan, 'pattern');
 }
 function showToast(msg, type="success") {

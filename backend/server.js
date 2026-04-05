@@ -13,61 +13,43 @@ const db = mysql.createConnection({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT || 3306,
-    ssl: { rejectUnauthorized: false }, // CRITICAL: Required by Aiven Cloud
+    ssl: { rejectUnauthorized: false },
     multipleStatements: true
 });
 
 db.connect((err) => {
     if (err) return console.error('Database Connection Error:', err);
-    console.log('SUCCESS: Connected to MySQL');
-    
-    const initSQL = `
-        CREATE DATABASE IF NOT EXISTS ${process.env.DB_NAME};
-        USE ${process.env.DB_NAME};
-        CREATE TABLE IF NOT EXISTS Employees (EmployeeID VARCHAR(20) PRIMARY KEY, FullName VARCHAR(100), Role VARCHAR(50));
-        CREATE TABLE IF NOT EXISTS Patterns (PatternID VARCHAR(50) PRIMARY KEY, PatternName VARCHAR(100), Location VARCHAR(50), Status VARCHAR(20) DEFAULT 'Available', BorrowedBy VARCHAR(20), DueDate VARCHAR(100));
-        INSERT IGNORE INTO Employees (EmployeeID, FullName, Role) VALUES 
-        ('EMP-090', 'P.G.S.S. Priyantha', 'Block Handler'), ('EMP-018', 'M.J.M. Ashfaq', 'Cutting Supervisor'), ('EMP-095', 'M.H. Rushan', 'Machine Operator'), ('EMP-117', 'J.R. Hetti', 'QC');
-        INSERT IGNORE INTO Patterns (PatternID, PatternName, Location, Status) VALUES 
-        ('VS7BXS', 'Victorias Secret 7B XS Mold', 'Rack A-12', 'Available'), ('LV-99X', 'Louis Vuitton Active Pattern', 'Rack C-01', 'Available'), ('NKE-M', 'Nike Pro Compression Top M', 'Rack B-05', 'Available'), ('LULU-L', 'Lululemon Align Legging L', 'Rack A-02', 'Available');
-    `;
-    db.query(initSQL, (err) => {
-        if(err) console.log("Init error:", err.message);
-        else console.log("Database & Test Data Ready!");
-    });
+    console.log('SUCCESS: Connected to Aiven MySQL');
 });
 
-// NEW ROUTE: Get ALL Patterns for Simulator
+// GET ALL
 app.get('/api/patterns', (req, res) => {
-    db.query("SELECT PatternID, PatternName FROM Patterns", (err, results) => {
+    db.query("SELECT * FROM Patterns", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
 });
-
-// NEW ROUTE: Get ALL Employees for Simulator
 app.get('/api/employees', (req, res) => {
-    db.query("SELECT EmployeeID, FullName, Role FROM Employees", (err, results) => {
+    db.query("SELECT * FROM Employees", (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
 });
 
+// SEARCH & EXACT
 app.get('/api/patterns/autocomplete/:query', (req, res) => {
     const term = `%${req.params.query}%`;
-    db.query("SELECT PatternID, PatternName FROM Patterns WHERE PatternID LIKE ? OR PatternName LIKE ? LIMIT 5", [term, term], (err, results) => {
+    db.query("SELECT PatternID, PatternName, ImageUrl FROM Patterns WHERE PatternID LIKE ? OR PatternName LIKE ? LIMIT 5", [term, term], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
 });
-
 app.get('/api/patterns/exact/:id', (req, res) => {
     db.query("SELECT * FROM Patterns WHERE PatternID = ?", [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results[0]);
     });
 });
-
 app.get('/api/employees/:id', (req, res) => {
     db.query("SELECT * FROM Employees WHERE EmployeeID = ?", [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -76,6 +58,7 @@ app.get('/api/employees/:id', (req, res) => {
     });
 });
 
+// LOGIC TRANSACTIONS
 app.post('/api/patterns/borrow', (req, res) => {
     const { patternId, employeeId, shiftStr } = req.body;
     db.query("UPDATE Patterns SET Status = 'Borrowed', BorrowedBy = ?, DueDate = ? WHERE PatternID = ?", [employeeId, shiftStr, patternId], (err) => {
@@ -83,24 +66,29 @@ app.post('/api/patterns/borrow', (req, res) => {
         res.json({ message: "Pattern checked out" });
     });
 });
-
 app.post('/api/patterns/return', (req, res) => {
-    const { patternId, returningEmployeeId, isDelegate } = req.body;
-    db.query("UPDATE Patterns SET Status = 'Available', BorrowedBy = NULL, DueDate = NULL WHERE PatternID = ?", [patternId], (err) => {
+    db.query("UPDATE Patterns SET Status = 'Available', BorrowedBy = NULL, DueDate = NULL WHERE PatternID = ?", [req.body.patternId], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "Pattern returned" });
     });
 });
 
+// NEW EXPANDED REGISTRATION
 app.post('/api/patterns/register', (req, res) => {
-    db.query("INSERT INTO Patterns (PatternID, PatternName, Location, Status) VALUES (?, ?, ?, 'Available')", [req.body.id, req.body.name, req.body.location], (err) => {
+    const { id, name, location, imgUrl, size, style } = req.body;
+    const finalImg = imgUrl || 'https://placehold.co/400x400/e2e8f0/475569?text=No+Pattern+Image';
+    const sql = "INSERT INTO Patterns (PatternID, PatternName, Location, Status, ImageUrl, SizeCategory, StyleNumber) VALUES (?, ?, ?, 'Available', ?, ?, ?)";
+    db.query(sql, [id, name, location, finalImg, size, style], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "Registered" });
     });
 });
 
 app.post('/api/employees/register', (req, res) => {
-    db.query("INSERT INTO Employees (EmployeeID, FullName, Role) VALUES (?, ?, ?)", [req.body.id, req.body.name, req.body.role], (err) => {
+    const { id, name, role, imgUrl, dept, contact } = req.body;
+    const finalImg = imgUrl || 'https://placehold.co/400x400/bfdbfe/1e3a8a?text=No+Face+Scan';
+    const sql = "INSERT INTO Employees (EmployeeID, FullName, Role, ImageUrl, Department, ContactNumber) VALUES (?, ?, ?, ?, ?, ?)";
+    db.query(sql, [id, name, role, finalImg, dept, contact], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "Registered" });
     });

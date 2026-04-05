@@ -187,15 +187,49 @@ async function triggerCameraForStep(message, callback, targetType) {
 function stopCamera() { if (scanner && scanner.isScanning) scanner.stop(); }
 function closeVerifyModal() { stopCamera(); document.getElementById('verify-modal').classList.add('opacity-0'); setTimeout(() => document.getElementById('verify-modal').classList.add('hidden'), 300); }
 
-function handlePatternScan(scannedId) {
-    if (!currentAsset) { selectPattern(scannedId); closeVerifyModal(); return; } 
-    if (scannedId !== currentAsset.PatternID) return showToast("Wrong Pattern!", "error");
+async function handlePatternScan(scannedId) {
+    // SCENARIO A: Quick Scan Pipeline (You used the floating blue button)
+    if (!currentAsset) {
+        try {
+            // Silently fetch the pattern from the database
+            const res = await fetch(`${API_BASE_URL}/patterns/exact/${scannedId}`);
+            const data = await res.json();
+            if (!data) { closeVerifyModal(); return showToast("Pattern Not Found", "error"); }
+            
+            // Inject it into the system memory
+            currentAsset = data;
+            
+            // Instantly decide the next action based on its database status
+            vState.flow = currentAsset.Status === 'Available' ? 'borrow' : 'return';
+            
+            // Update the Modal Title and unhide the step indicators
+            document.getElementById('modal-title').innerText = vState.flow === 'borrow' ? "Checkout Protocol" : "Return Protocol";
+            document.getElementById('step-1-indicator').parentElement.classList.remove('hidden');
+            
+            // Silently load the background page so it's ready when you finish
+            renderAssetCard();
+            document.getElementById('view-home').classList.add('hidden');
+            document.getElementById('view-asset').classList.remove('hidden');
+        } catch (err) {
+            closeVerifyModal();
+            return showToast("Database error.", "error");
+        }
+    } 
+    // SCENARIO B: Standard Pipeline (You clicked Borrow/Return on the asset card)
+    else {
+        if (scannedId !== currentAsset.PatternID) return showToast("Wrong Pattern!", "error");
+    }
+
+    // PROCEED TO STEP 2 (Operator Check)
     document.getElementById('step-1-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Pattern Scanned`;
     document.getElementById('step-1-indicator').className = "flex items-center gap-1 text-blue-600";
-    if (vState.flow === 'borrow') triggerCameraForStep("Step 2: Scan Operator Badge", handleOperatorScan, 'operator');
-    else askReturnDelegate();
+    
+    if (vState.flow === 'borrow') {
+        triggerCameraForStep("Step 2: Scan Operator Badge", handleOperatorScan, 'operator');
+    } else {
+        askReturnDelegate();
+    }
 }
-
 function askReturnDelegate() {
     document.getElementById('modal-dynamic-area').innerHTML = `
         <p class="font-bold text-slate-800 mb-6 text-center text-lg">Are you the original borrower?</p>

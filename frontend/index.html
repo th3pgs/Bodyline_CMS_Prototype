@@ -78,15 +78,25 @@
                 <div class="flex gap-4"><button onclick="loadSupervisorDashboard()" class="text-neutral-400 hover:text-white bg-neutral-900 px-3 py-1.5 rounded border border-neutral-800 font-mono text-xs"><i class="ph ph-arrows-clockwise text-sm"></i> Sync Database</button></div>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 shrink-0">
-                <div class="bg-neutral-900 p-4 rounded-xl border border-neutral-800 lg:col-span-1 flex flex-col h-64">
+           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 shrink-0">
+                
+                <div class="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex flex-col h-64">
                     <h3 class="font-mono text-sm text-amber-500 mb-3 uppercase tracking-widest border-b border-neutral-800 pb-2 flex items-center gap-2"><i class="ph-fill ph-ticket"></i> Clearance Tickets</h3>
                     <div id="supervisor-queue-list" class="space-y-2 overflow-y-auto pr-2 custom-scroll flex-1"></div>
                 </div>
-                <div class="bg-neutral-900 p-4 rounded-xl border border-neutral-800 lg:col-span-2 flex flex-col h-64">
-                    <h3 class="font-mono text-sm text-blue-400 mb-3 uppercase tracking-widest border-b border-neutral-800 pb-2 flex items-center gap-2"><i class="ph-fill ph-users"></i> Unassigned Operator Pool (Drag to Calendar)</h3>
+                
+                <div class="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex flex-col h-64">
+                    <h3 class="font-mono text-sm text-emerald-400 mb-3 uppercase tracking-widest border-b border-neutral-800 pb-2 flex items-center gap-2"><i class="ph-fill ph-clock-countdown"></i> Active Deployments</h3>
+                    <div id="supervisor-active-list" class="space-y-2 overflow-y-auto pr-2 custom-scroll flex-1">
+                        <p class="text-neutral-500 text-[10px] font-mono py-4 text-center">Syncing radar...</p>
+                    </div>
+                </div>
+
+                <div class="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex flex-col h-64">
+                    <h3 class="font-mono text-sm text-blue-400 mb-3 uppercase tracking-widest border-b border-neutral-800 pb-2 flex items-center gap-2"><i class="ph-fill ph-users"></i> Operator Pool</h3>
                     <div id="operator-pool" class="flex flex-wrap gap-2 overflow-y-auto pr-2 custom-scroll flex-1 items-start content-start"></div>
                 </div>
+                
             </div>
 
             <div class="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex-1 flex flex-col min-h-[400px]">

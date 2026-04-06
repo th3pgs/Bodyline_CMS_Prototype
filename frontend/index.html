@@ -30,7 +30,7 @@
             </button>
             <button onclick="navTo('supervisor-auth')" class="group bg-neutral-900 border border-neutral-800 hover:border-amber-500 p-6 rounded-xl text-left transition-all hover:bg-neutral-800 flex items-center justify-between">
                 <div>
-                    <h2 class="text-lg font-bold text-white uppercase tracking-wide">Command Dashboard</h2>
+                    <h2 class="text-lg font-bold text-white uppercase tracking-wide">Supervisor Dashboard</h2>
                     <p class="text-neutral-500 text-xs font-mono mt-1">Supervisor Portal & Clearance</p>
                 </div>
                 <i class="ph-fill ph-caret-right text-xl text-amber-500 group-hover:translate-x-2 transition-transform"></i>
@@ -230,6 +230,18 @@
             <div class="p-6 flex flex-col h-full flex-1">
                 <div class="flex items-center justify-between mb-4 text-[10px] font-mono uppercase tracking-widest text-neutral-600 pb-4 shrink-0"><div id="step-1-indicator" class="flex items-center gap-2"><div class="w-2 h-2 rounded-full border border-current"></div> Target</div><div class="flex-1 border-t border-dashed border-neutral-800 mx-4"></div><div id="step-2-indicator" class="flex items-center gap-2"><div class="w-2 h-2 rounded-full border border-current"></div> Operator</div></div>
                 <div id="modal-dynamic-area" class="flex-1 flex flex-col justify-start items-center overflow-y-auto custom-scroll w-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="fixed inset-0 bg-black/95 backdrop-blur z-[60] flex items-center justify-center hidden opacity-0 transition-opacity p-4">
+        <div class="bg-neutral-950 border border-neutral-800 w-full max-w-md rounded p-6 transform scale-95 transition-transform" id="edit-modal-content">
+            <h3 id="edit-modal-title" class="font-mono text-lg text-white mb-6 uppercase tracking-widest border-b border-neutral-800 pb-2 flex items-center gap-2"><i class="ph ph-pencil-simple text-blue-500"></i> Edit Record</h3>
+            <div id="edit-modal-form" class="flex flex-col gap-3 mb-6">
+                </div>
+            <div class="flex gap-3">
+                <button onclick="saveLedgerEdit()" class="flex-1 bg-blue-600 text-white font-mono text-xs uppercase tracking-widest py-3 rounded hover:bg-blue-500 transition-colors">Commit Changes</button>
+                <button onclick="closeModal('edit-modal')" class="flex-1 bg-transparent border border-neutral-700 text-neutral-400 font-mono text-xs uppercase tracking-widest py-3 rounded hover:bg-neutral-800 transition-colors">Abort</button>
             </div>
         </div>
     </div>

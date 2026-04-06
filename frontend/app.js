@@ -8,7 +8,9 @@ let calendarWeekOffset = 0;
 
 // ==========================================
 // 1. BOOT SEQUENCE & ROUTING
-// ==========================================
+// ========================================
+
+
 document.addEventListener('DOMContentLoaded', () => {
     startNasaClock();
     fetchAndPopulateSettings();

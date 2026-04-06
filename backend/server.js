@@ -163,7 +163,7 @@ app.post('/api/assignments', async (req, res) => {
 app.get('/api/requests', async (req, res) => {
     try {
         const [rows] = await db.query(`
-            SELECT p.RequestID, p.PatternID, p.RequestedShift, p.RequestTime, p.RequestStatus, b.BorrowerID, b.FullName, b.Role, b.ImageUrl 
+            SELECT p.RequestID, p.PatternID, p.RequestedShift, p.RequestedDate, p.RequestTime, p.RequestStatus, b.BorrowerID, b.FullName, b.Role, b.ImageUrl 
             FROM PendingRequests p 
             JOIN Borrowers b ON p.BorrowerID = b.BorrowerID 
             WHERE p.RequestStatus IN ('Pending', 'Approved') ORDER BY p.RequestTime DESC

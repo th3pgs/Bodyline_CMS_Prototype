@@ -217,6 +217,31 @@ app.post('/api/patterns/borrow', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ==========================================
+// THE MASTER LEDGER: EDIT PROTOCOLS
+// ==========================================
+app.put('/api/patterns/:id', async (req, res) => {
+    const { name, brand, style, size, loc, imgUrl } = req.body;
+    try {
+        await db.query("UPDATE Patterns SET PatternName=?, Brand=?, StyleNumber=?, SizeCategory=?, RackLocation=?, ImageUrl=? WHERE PatternID=?", 
+        [name, brand, style, size, loc, imgUrl, req.params.id]);
+        
+        await db.query("INSERT INTO AuditLog (LogCategory, ActionType, LogData) VALUES ('System', 'EDIT_ASSET', ?)", [req.params.id]);
+        res.json({ message: "Asset Updated" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/borrowers/:id', async (req, res) => {
+    const { name, role, imgUrl } = req.body;
+    try {
+        await db.query("UPDATE Borrowers SET FullName=?, Role=?, ImageUrl=? WHERE BorrowerID=?", 
+        [name, role, imgUrl, req.params.id]);
+        
+        await db.query("INSERT INTO AuditLog (LogCategory, ActionType, LogData) VALUES ('System', 'EDIT_BORROWER', ?)", [req.params.id]);
+        res.json({ message: "Borrower Updated" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // THE CMS PLUS RETURN PROTOCOL
 app.post('/api/patterns/return', async (req, res) => {
     const { patternId } = req.body;

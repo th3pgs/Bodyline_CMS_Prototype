@@ -2,12 +2,13 @@ const API_BASE_URL = 'https://bodyline-cms-api.onrender.com/api';
 let scanner = null; 
 let currentAsset = null; 
 let vState = { flow: null, empScanned: null, isDelegate: false };
+let liveTimerInterval = null;
 
 // ==========================================
 // 1. INITIALIZATION & ROUTING
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('current-date-display').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    startNasaClock();
     initSystem();
 });
 
@@ -15,18 +16,22 @@ async function initSystem() {
     await fetchAndPopulateSettings();
 }
 
+function startNasaClock() {
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('current-time-display').innerText = now.toLocaleTimeString('en-US', { hour12: false });
+    }, 1000);
+}
+
 function navTo(viewId) {
-    // Hide all views
-    ['view-gateway', 'view-tracker', 'view-supervisor', 'view-admin'].forEach(id => {
+    ['view-gateway', 'view-tracker', 'view-supervisor', 'view-admin', 'view-asset'].forEach(id => {
         document.getElementById(id).classList.add('hidden');
     });
     
-    // Manage Header Visibility
     const header = document.getElementById('main-header');
     if (viewId === 'gateway') header.classList.add('hidden');
     else header.classList.remove('hidden');
 
-    // Handle specific auth logic or direct routing
     if (viewId === 'admin-auth') {
         const m = document.getElementById('admin-auth-modal');
         m.classList.remove('hidden'); setTimeout(() => m.classList.remove('opacity-0'), 10);
@@ -35,18 +40,14 @@ function navTo(viewId) {
         m.classList.remove('hidden'); setTimeout(() => m.classList.remove('opacity-0'), 10);
     } else {
         document.getElementById(`view-${viewId}`).classList.remove('hidden');
-        if (viewId === 'tracker') {
-            document.getElementById('view-asset').classList.add('hidden'); // Ensure detail card is hidden
-            document.getElementById('searchInput').value = '';
-            document.getElementById('autocomplete-dropdown').classList.add('hidden');
-        }
-        if (viewId === 'admin') { loadSystemSettingsList(); loadAuditLog(); }
-        if (viewId === 'supervisor') loadSupervisorDashboard();
+        if (viewId === 'tracker') { loadTrackerGrid(); }
+        if (viewId === 'admin') { switchAdminTab('sys'); }
+        if (viewId === 'supervisor') { loadSupervisorDashboard(); }
     }
 }
 
 // ==========================================
-// 2. MODAL & AUTH MANAGEMENT
+// 2. MODAL & UI MANAGEMENT
 // ==========================================
 function closeModal(modalId) {
     const m = document.getElementById(modalId);
@@ -61,13 +62,14 @@ function executeLogout() { closeModal('logout-modal'); navTo('gateway'); }
 
 function showToast(msg, type="success") {
     const t = document.createElement('div');
-    t.className = `fixed bottom-8 left-1/2 transform -translate-x-1/2 ${type === "error" ? "bg-red-600" : "bg-emerald-600"} text-white px-6 py-3 rounded-xl shadow-2xl z-[100] fade-in font-bold tracking-wide flex items-center gap-2 border border-white/20`;
-    t.innerHTML = `<i class="ph ${type === 'error' ? 'ph-warning-circle' : 'ph-check-circle'} text-xl"></i> ${msg}`;
+    const color = type === "error" ? "bg-red-900 border-red-500 text-red-100" : "bg-neutral-800 border-blue-500 text-blue-100";
+    const icon = type === "error" ? "ph-warning-octagon text-red-500" : "ph-check-circle text-blue-500";
+    t.className = `fixed bottom-8 right-8 ${color} border px-6 py-4 rounded-lg shadow-2xl z-[100] fade-in font-mono text-xs uppercase tracking-widest flex items-center gap-3`;
+    t.innerHTML = `<i class="ph-fill ${icon} text-2xl"></i> ${msg}`;
     document.body.appendChild(t);
-    setTimeout(() => { t.classList.replace('fade-in', 'opacity-0'); t.style.transition = 'opacity 0.3s ease'; setTimeout(() => t.remove(), 300); }, 3000);
+    setTimeout(() => { t.classList.replace('fade-in', 'opacity-0'); t.style.transition = 'opacity 0.3s ease'; setTimeout(() => t.remove(), 300); }, 3500);
 }
 
-// BULLETPROOF PRINTING
 function printQR(targetId) {
     const el = document.getElementById(targetId);
     el.classList.add('print-active');
@@ -76,22 +78,33 @@ function printQR(targetId) {
 }
 
 // ==========================================
-// 3. DYNAMIC CONFIGURATION ENGINE
+// 3. ADMIN: TABS & SYSTEM PARAMETERS
 // ==========================================
+function switchAdminTab(tabName) {
+    ['sys', 'reg', 'info'].forEach(t => {
+        document.getElementById(`admin-tab-${t}`).classList.add('hidden');
+        document.getElementById(`tab-btn-${t}`).className = "px-6 py-3 font-mono text-xs uppercase tracking-widest border-b-2 border-transparent text-neutral-500 hover:text-neutral-300 transition-colors";
+    });
+    
+    document.getElementById(`admin-tab-${tabName}`).classList.remove('hidden');
+    document.getElementById(`tab-btn-${tabName}`).className = "px-6 py-3 font-mono text-xs uppercase tracking-widest border-b-2 border-blue-500 text-blue-400 transition-colors";
+
+    if(tabName === 'sys') loadSystemSettingsList();
+    if(tabName === 'info') loadAuditLog();
+    if(tabName === 'reg') fetchAndPopulateSettings();
+}
+
 async function fetchAndPopulateSettings() {
     try {
         const res = await fetch(`${API_BASE_URL}/settings`);
         const settings = await res.json();
         
-        // Reset dropdowns
         const dd = {
             'Brand': document.getElementById('reg-brand'),
             'Size': document.getElementById('reg-size'),
             'Rack': document.getElementById('reg-rack-l'),
-            'Department': document.getElementById('reg-emp-dept'),
             'Role': document.getElementById('reg-emp-role')
         };
-        
         Object.keys(dd).forEach(key => { if(dd[key]) dd[key].innerHTML = `<option value="">Select ${key}</option>`; });
 
         settings.forEach(s => {
@@ -103,232 +116,308 @@ async function fetchAndPopulateSettings() {
                 dd[s.Category].appendChild(opt);
             }
         });
-    } catch (e) { console.error("Failed to load settings"); }
+    } catch (e) { console.error("Config fetch failed"); }
 }
 
-// ==========================================
-// 4. ADMIN CONSOLE LOGIC
-// ==========================================
 async function addSystemSetting() {
     const cat = document.getElementById('sys-cat').value;
     const val = document.getElementById('sys-val').value;
     const prefix = document.getElementById('sys-prefix').value;
-    
-    if(!val) return showToast("Enter a value", "error");
+    if(!val) return showToast("Enter a parameter value", "error");
     
     try {
         await fetch(`${API_BASE_URL}/settings`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ category: cat, value: val, prefix: prefix }) });
         document.getElementById('sys-val').value = ''; document.getElementById('sys-prefix').value = '';
-        showToast(`Added ${val} to ${cat}`);
-        fetchAndPopulateSettings();
+        showToast(`Parameter Injected: ${val}`);
         loadSystemSettingsList();
-    } catch(e) { showToast("Error saving setting", "error"); }
+    } catch(e) { showToast("Injection Failed", "error"); }
 }
 
 async function loadSystemSettingsList() {
     try {
+        const filter = document.getElementById('sys-filter').value;
         const res = await fetch(`${API_BASE_URL}/settings`);
-        const settings = await res.json();
+        let settings = await res.json();
+        if (filter !== 'All') settings = settings.filter(s => s.Category === filter);
+
         document.getElementById('system-settings-list').innerHTML = settings.map(s => `
-            <li class="flex justify-between items-center p-2 bg-white rounded border border-slate-100">
-                <span><b>${s.Category}:</b> ${s.SettingValue}</span> <span class="text-xs font-mono text-slate-400">${s.PrefixData || ''}</span>
+            <li class="flex justify-between items-center p-3 bg-black border border-neutral-800 rounded group">
+                <span class="text-neutral-300 font-bold tracking-wide">${s.Category}: <span class="text-white">${s.SettingValue}</span></span> 
+                <div class="flex items-center gap-3">
+                    <span class="text-[10px] text-blue-500">${s.PrefixData || ''}</span>
+                    <button onclick="deleteSystemSetting(${s.SettingID})" class="text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph ph-trash"></i></button>
+                </div>
             </li>
         `).join('');
     } catch (e) { }
 }
 
+async function deleteSystemSetting(id) {
+    try {
+        await fetch(`${API_BASE_URL}/settings/${id}`, { method: 'DELETE' });
+        loadSystemSettingsList();
+        showToast("Parameter purged.");
+    } catch(e) { showToast("Purge failed.", "error"); }
+}
+
+// ==========================================
+// 4. ADMIN: REGISTRATION & INFO CENTER
+// ==========================================
 async function loadAuditLog() {
     try {
+        const filter = document.getElementById('log-filter').value;
         const res = await fetch(`${API_BASE_URL}/auditlog`);
-        const logs = await res.json();
+        let logs = await res.json();
+        if (filter !== 'All') logs = logs.filter(l => l.LogCategory === filter);
+
         const terminal = document.getElementById('audit-log-terminal');
-        terminal.innerHTML = logs.map(l => `
-            <div class="border-b border-green-900/50 pb-2">
-                <span class="text-green-200">[${new Date(l.DeletedAt).toLocaleString()}]</span> 
-                <span class="font-bold text-amber-400">${l.ActionType}</span><br>
-                <span class="opacity-80">${l.DeletedData}</span>
-            </div>
-        `).join('') || '<p class="text-slate-500">No logs found.</p>';
+        terminal.innerHTML = logs.map(l => {
+            const color = l.LogCategory === 'Delete' ? 'text-red-400' : l.LogCategory === 'Register' ? 'text-blue-400' : 'text-amber-400';
+            return `<div class="border-b border-neutral-800 pb-2">
+                <span class="text-neutral-500">[${new Date(l.CreatedAt).toLocaleString()}]</span> 
+                <span class="font-bold ${color} ml-2">${l.ActionType}</span><br>
+                <span class="opacity-70 text-neutral-400 ml-4">${l.LogData}</span>
+            </div>`;
+        }).join('') || '<p class="text-neutral-600">No logs found.</p>';
     } catch (e) { }
 }
 
 async function registerAsset() {
     const name = document.getElementById('reg-name').value;
-    const brandDropdown = document.getElementById('reg-brand');
-    const brand = brandDropdown.value;
-    const prefix = brandDropdown.options[brandDropdown.selectedIndex]?.dataset.prefix || 'PAT';
+    const brandDd = document.getElementById('reg-brand');
+    const brand = brandDd.value;
+    const prefix = brandDd.options[brandDd.selectedIndex]?.dataset.prefix || 'PAT';
     const style = document.getElementById('reg-style').value;
     const size = document.getElementById('reg-size').value;
     const rackL = document.getElementById('reg-rack-l').value;
     const rackP = document.getElementById('reg-rack-p').value;
-    const imgUrl = document.getElementById('reg-img').value;
+    const imgUrl = document.getElementById('reg-img').value || 'https://placehold.co/400x400/171717/ffffff?text=No+Image';
 
-    if(!name || !brand || !style || !size || !rackL) return showToast("Fill all asset fields", "error");
+    if(!name || !brand || !style || !size || !rackL || !rackP) return showToast("Config Incomplete", "error");
     
     const newId = `${prefix}-${style}-${Math.floor(100 + Math.random() * 900)}`;
-    const loc = `Rack ${rackL}-${rackP}`;
+    const loc = `Rack ${rackL}-${rackP.padStart(2, '0')}`;
     
-    await fetch(`${API_BASE_URL}/patterns/register`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: newId, name, brand, style, size, rackL, rackP, loc, imgUrl}) });
+    await fetch(`${API_BASE_URL}/patterns/register`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: newId, name, brand, style, size, loc, imgUrl}) });
     
     document.getElementById('admin-qr-output-pattern').classList.remove('hidden');
     document.getElementById('qr-text-pattern').innerText = newId;
-    
-    setTimeout(() => {
-        document.getElementById('qrcode-image-pattern').innerHTML = "";
-        new QRCode(document.getElementById("qrcode-image-pattern"), { text: newId, width: 160, height: 160, colorDark: "#0f172a" });
-    }, 50);
-    showToast("Asset Block Registered!");
+    setTimeout(() => { document.getElementById('qrcode-image-pattern').innerHTML = ""; new QRCode(document.getElementById("qrcode-image-pattern"), { text: newId, width: 140, height: 140, colorDark: "#000000" }); }, 50);
 }
 
 async function registerOperator() {
     const name = document.getElementById('reg-emp-name').value;
-    const dept = document.getElementById('reg-emp-dept').value;
     const role = document.getElementById('reg-emp-role').value;
-    const contact = document.getElementById('reg-emp-contact').value;
-    const imgUrl = document.getElementById('reg-emp-img').value;
+    const imgUrl = document.getElementById('reg-emp-img').value || 'https://placehold.co/400x400/171717/ffffff?text=Face';
 
-    if(!name || !dept || !role) return showToast("Fill all borrower fields", "error");
+    if(!name || !role) return showToast("Config Incomplete", "error");
     
     const newId = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
-    
-    await fetch(`${API_BASE_URL}/borrowers/register`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: newId, name, role, dept, contact, imgUrl}) });
+    await fetch(`${API_BASE_URL}/borrowers/register`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({id: newId, name, role, imgUrl}) });
     
     document.getElementById('admin-qr-output-emp').classList.remove('hidden');
     document.getElementById('qr-text-emp').innerText = newId;
+    setTimeout(() => { document.getElementById('qrcode-image-emp').innerHTML = ""; new QRCode(document.getElementById("qrcode-image-emp"), { text: newId, width: 140, height: 140, colorDark: "#059669" }); }, 50);
+}
 
-    setTimeout(() => {
-        document.getElementById('qrcode-image-emp').innerHTML = "";
-        new QRCode(document.getElementById("qrcode-image-emp"), { text: newId, width: 160, height: 160, colorDark: "#2563eb" });
-    }, 50);
-    showToast("Borrower Registered!");
+function finishRegistering(type) {
+    document.getElementById(`admin-qr-output-${type}`).classList.add('hidden');
+    if(type === 'pattern') {
+        ['reg-name', 'reg-style', 'reg-rack-p', 'reg-img'].forEach(id => document.getElementById(id).value = '');
+    } else {
+        ['reg-emp-name', 'reg-emp-img'].forEach(id => document.getElementById(id).value = '');
+    }
 }
 
 // ==========================================
-// 5. SUPERVISOR PORTAL LOGIC
+// 5. DIGITAL PATTERN ROOM (Grid & Search)
 // ==========================================
-async function loadSupervisorDashboard() {
-    try {
-        const [borrowersRes, patternsRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/borrowers`),
-            fetch(`${API_BASE_URL}/patterns`)
-        ]);
-        const borrowers = await borrowersRes.json();
-        const patterns = await patternsRes.json();
+let allPatternsMemory = [];
 
-        // Populate Shift Management (Focus on UNASSIGNED)
-        const bList = document.getElementById('supervisor-borrowers-list');
-        bList.innerHTML = borrowers.map(b => `
-            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border ${b.DesignatedShift === 'UNASSIGNED' ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}">
-                <div class="flex items-center gap-3">
-                    <img src="${b.ImageUrl}" class="w-10 h-10 rounded-full object-cover shadow-sm" onerror="this.src='https://placehold.co/100x100?text=Face'">
-                    <div><p class="font-bold text-slate-800 leading-tight">${b.FullName}</p><p class="text-[10px] text-slate-500 font-mono">${b.BorrowerID} | ${b.Role}</p></div>
+async function loadTrackerGrid() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/patterns`);
+        allPatternsMemory = await res.json();
+        renderGrid(allPatternsMemory);
+    } catch (e) { document.getElementById('tracker-grid').innerHTML = '<p class="text-red-500 font-mono text-sm">Database connection failed.</p>'; }
+}
+
+function renderGrid(data) {
+    const grid = document.getElementById('tracker-grid');
+    if(data.length === 0) { grid.innerHTML = '<p class="text-neutral-500 font-mono text-sm col-span-full">No assets found matching parameters.</p>'; return; }
+    
+    grid.innerHTML = data.map(p => `
+        <div onclick="selectAsset('${p.PatternID}')" class="asset-grid-card bg-neutral-900 rounded-lg overflow-hidden cursor-pointer flex flex-col h-64 relative group">
+            <div class="h-32 w-full bg-black relative">
+                <img src="${p.ImageUrl}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">
+                <div class="absolute top-2 right-2 px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-widest ${p.Status === 'Available' ? 'bg-blue-600/90 text-white' : 'bg-amber-500/90 text-black'}">${p.Status}</div>
+            </div>
+            <div class="p-4 flex-1 flex flex-col justify-between border-t border-neutral-800">
+                <div>
+                    <p class="text-[9px] font-mono text-blue-500 uppercase tracking-widest mb-1">${p.Brand}</p>
+                    <h3 class="font-bold text-sm text-neutral-200 leading-tight line-clamp-2">${p.PatternName}</h3>
                 </div>
-                <div class="flex items-center gap-2">
-                    <select id="shift-assign-${b.BorrowerID}" class="p-2 text-sm rounded-lg border border-slate-200 outline-none font-bold ${b.DesignatedShift === 'UNASSIGNED' ? 'text-amber-600' : 'text-slate-700'}">
-                        <option value="UNASSIGNED" ${b.DesignatedShift === 'UNASSIGNED' ? 'selected' : ''}>UNASSIGNED</option>
-                        <option value="Shift A (Morning)" ${b.DesignatedShift === 'Shift A (Morning)' ? 'selected' : ''}>Shift A</option>
-                        <option value="Shift B (Afternoon)" ${b.DesignatedShift === 'Shift B (Afternoon)' ? 'selected' : ''}>Shift B</option>
-                        <option value="Shift C (Evening)" ${b.DesignatedShift === 'Shift C (Evening)' ? 'selected' : ''}>Shift C</option>
-                    </select>
-                    <button onclick="updateShift('${b.BorrowerID}')" class="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><i class="ph ph-check-bold"></i></button>
+                <div class="flex justify-between items-end mt-2">
+                    <p class="font-mono text-[10px] text-neutral-500">${p.PatternID}</p>
+                    <p class="font-mono text-[10px] text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded">${p.RackLocation}</p>
                 </div>
             </div>
-        `).join('');
-
-        // Populate Active Checkouts
-        const activePatterns = patterns.filter(p => p.Status === 'Borrowed');
-        const pList = document.getElementById('supervisor-active-list');
-        if (activePatterns.length === 0) {
-            pList.innerHTML = `<p class="text-slate-400 text-sm text-center py-4">No active checkouts.</p>`;
-        } else {
-            pList.innerHTML = activePatterns.map(p => `
-                <div class="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
-                    <div><p class="font-bold text-blue-900">${p.PatternName}</p><p class="text-xs text-blue-700 font-mono">${p.PatternID} | ${p.Location}</p></div>
-                    <div class="text-right"><p class="text-[10px] font-bold uppercase tracking-widest text-blue-500">Held By</p><p class="font-bold text-slate-800">${p.BorrowedBy}</p></div>
-                </div>
-            `).join('');
-        }
-
-    } catch (e) { showToast("Failed to load dashboard", "error"); }
+        </div>
+    `).join('');
 }
 
-async function updateShift(borrowerId) {
-    const shift = document.getElementById(`shift-assign-${borrowerId}`).value;
-    try {
-        await fetch(`${API_BASE_URL}/borrowers/${borrowerId}/shift`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ shift }) });
-        showToast("Shift updated!");
-        loadSupervisorDashboard(); // Refresh
-    } catch(e) { showToast("Update failed", "error"); }
-}
-
-// ==========================================
-// 6. ASSET TRACKER & OVERWATCH SEARCH
-// ==========================================
-const searchInput = document.getElementById('searchInput');
-const dropdown = document.getElementById('autocomplete-dropdown');
-
-searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { const val = e.target.value.trim(); if(val) selectPattern(val); } });
-searchInput.addEventListener('input', async (e) => {
-    const val = e.target.value.trim();
+// Local Instant Search
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    const val = e.target.value.toLowerCase().trim();
     if (val.length > 0) document.getElementById('clearBtn').classList.remove('hidden');
-    else { document.getElementById('clearBtn').classList.add('hidden'); dropdown.classList.add('hidden'); return; }
-
-    try {
-        const res = await fetch(`${API_BASE_URL}/patterns/autocomplete/${val}`);
-        const matches = await res.json();
-        if (matches.length > 0) {
-            dropdown.innerHTML = matches.map(m => `
-                <div onclick="selectPattern('${m.PatternID}')" class="px-5 py-3 hover:bg-slate-50 cursor-pointer flex items-center gap-4 border-b border-slate-50 group">
-                    <img src="${m.ImageUrl}" class="w-12 h-12 object-cover rounded-lg border border-slate-200 shadow-sm" onerror="this.src='https://placehold.co/400x400/e2e8f0/475569?text=Image+Error'">
-                    <div class="flex-1"><p class="font-bold text-slate-700 group-hover:text-blue-600">${m.PatternName}</p><p class="text-xs font-mono text-slate-400">${m.PatternID}</p></div>
-                </div>
-            `).join('');
-            dropdown.classList.remove('hidden');
-        }
-    } catch (err) {}
+    else document.getElementById('clearBtn').classList.add('hidden');
+    
+    const filtered = allPatternsMemory.filter(p => 
+        p.PatternName.toLowerCase().includes(val) || 
+        p.PatternID.toLowerCase().includes(val) || 
+        p.Brand.toLowerCase().includes(val) || 
+        p.StyleNumber.toLowerCase().includes(val)
+    );
+    renderGrid(filtered);
 });
 
-function clearSearch() { searchInput.value = ''; searchInput.dispatchEvent(new Event('input')); }
+function clearSearch() { document.getElementById('searchInput').value = ''; document.getElementById('searchInput').dispatchEvent(new Event('input')); }
 
-async function selectPattern(id) {
-    dropdown.classList.add('hidden');
+async function selectAsset(id) {
     try {
         const res = await fetch(`${API_BASE_URL}/patterns/exact/${id}`);
-        const data = await res.json();
-        if(!data) return showToast("Pattern Not Found", "error");
-        currentAsset = data;
+        currentAsset = await res.json();
         renderAssetCard();
         document.getElementById('view-tracker').classList.add('hidden');
         document.getElementById('view-asset').classList.remove('hidden');
-    } catch (err) { showToast("Database error.", "error"); }
+    } catch (err) { showToast("Fetch failed", "error"); }
 }
 
 function renderAssetCard() {
     const isAvail = currentAsset.Status === 'Available';
     let html = `
-        <div class="bg-white w-full rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
-            <div class="h-64 w-full bg-slate-100 border-b border-slate-200 relative">
-                <img src="${currentAsset.ImageUrl}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/800x400/e2e8f0/475569?text=No+Image'">
-                <div class="absolute top-4 right-4 px-4 py-2 rounded-full text-xs uppercase font-bold tracking-widest shadow-md ${isAvail ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}">${currentAsset.Status}</div>
+        <div class="bg-neutral-900 w-full rounded-xl border border-neutral-800 overflow-hidden shadow-2xl">
+            <div class="h-64 w-full bg-black relative border-b border-neutral-800">
+                <img src="${currentAsset.ImageUrl}" class="w-full h-full object-cover opacity-90">
+                <div class="absolute top-4 right-4 px-3 py-1 rounded text-xs uppercase font-bold tracking-widest ${isAvail ? 'bg-blue-600 text-white' : 'bg-amber-500 text-black'}">${currentAsset.Status}</div>
             </div>
             <div class="p-8">
-                <p class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">${currentAsset.Brand}</p>
-                <h2 class="text-3xl font-bold text-slate-800 mb-1">${currentAsset.PatternName}</h2>
-                <p class="font-mono text-slate-500 mb-6">ID: ${currentAsset.PatternID}</p>
+                <p class="text-xs font-mono uppercase tracking-widest text-blue-500 mb-2">${currentAsset.Brand}</p>
+                <h2 class="text-3xl font-bold text-white mb-1">${currentAsset.PatternName}</h2>
+                <p class="font-mono text-neutral-500 mb-8">${currentAsset.PatternID}</p>
                 
-                <div class="grid grid-cols-2 gap-4 mb-8">
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Location</p><p class="font-bold text-slate-800">${currentAsset.Location}</p></div>
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Style No.</p><p class="font-bold text-slate-800">${currentAsset.StyleNumber}</p></div>
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 col-span-2"><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Size Category</p><p class="font-bold text-slate-800">${currentAsset.SizeCategory}</p></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-black p-4 rounded border border-neutral-800"><p class="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">Location</p><p class="font-bold text-neutral-200">${currentAsset.RackLocation}</p></div>
+                    <div class="bg-black p-4 rounded border border-neutral-800"><p class="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">Style</p><p class="font-bold text-neutral-200">${currentAsset.StyleNumber}</p></div>
+                    <div class="bg-black p-4 rounded border border-neutral-800 col-span-2"><p class="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">Size Category</p><p class="font-bold text-neutral-200">${currentAsset.SizeCategory}</p></div>
                 </div>
     `;
     if (isAvail) {
-        html += `<button onclick="startVerification('borrow')" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-700 text-lg flex items-center justify-center gap-2"><i class="ph ph-qr-code text-2xl"></i> Initiate Checkout</button>`;
+        html += `<button onclick="startVerification('borrow')" class="w-full bg-blue-600 text-white font-bold py-4 rounded hover:bg-blue-500 text-sm tracking-widest uppercase flex items-center justify-center gap-2"><i class="ph ph-qr-code text-xl"></i> Initiate Checkout Protocol</button>`;
     } else {
-        html += `<div class="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-6"><p class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">Active Checkout</p><p class="font-bold text-slate-800 mt-1">Operator ID: ${currentAsset.BorrowedBy}</p><p class="text-xs mt-2 text-amber-600 font-bold">Due: ${currentAsset.DueDate}</p></div>
-                 <button onclick="startVerification('return')" class="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-slate-800 text-lg flex items-center justify-center gap-2"><i class="ph ph-qr-code text-2xl"></i> Process Return</button>`;
+        html += `<div class="bg-amber-900/20 p-4 rounded border border-amber-700/50 mb-6 flex justify-between items-center"><div class="flex flex-col"><p class="text-[10px] font-mono text-amber-500 uppercase tracking-widest">Active Checkout</p><p class="font-bold text-amber-100 mt-1">${currentAsset.BorrowedBy}</p></div><div class="text-right"><p class="text-[10px] font-mono text-amber-500 uppercase tracking-widest">Shift</p><p class="font-bold text-amber-100 mt-1">${currentAsset.ShiftCheckout}</p></div></div>
+                 <button onclick="startVerification('return')" class="w-full bg-neutral-800 text-white font-bold py-4 rounded border border-neutral-700 hover:bg-neutral-700 text-sm tracking-widest uppercase flex items-center justify-center gap-2"><i class="ph ph-qr-code text-xl"></i> Process Return</button>`;
     }
     document.getElementById('asset-card-container').innerHTML = html + `</div></div>`;
+}
+
+// ==========================================
+// 6. SUPERVISOR COMMAND DASHBOARD (Timers & Queue)
+// ==========================================
+async function loadSupervisorDashboard() {
+    try {
+        const [requestsRes, patternsRes] = await Promise.all([ fetch(`${API_BASE_URL}/requests`), fetch(`${API_BASE_URL}/patterns`) ]);
+        const requests = await requestsRes.json();
+        const patterns = await patternsRes.json();
+
+        // Populate Ticketing Queue
+        const qList = document.getElementById('supervisor-queue-list');
+        if(requests.length === 0) {
+            qList.innerHTML = `<p class="text-neutral-500 font-mono text-xs text-center py-4">No pending clearance requests.</p>`;
+        } else {
+            qList.innerHTML = requests.map(r => `
+                <div class="p-4 bg-black rounded border border-amber-900/50 flex flex-col gap-3">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-3">
+                            <img src="${r.ImageUrl}" class="w-8 h-8 rounded-full opacity-80" onerror="this.src='https://placehold.co/100?text=Face'">
+                            <div><p class="font-bold text-white text-sm">${r.FullName}</p><p class="text-[10px] font-mono text-neutral-500">${r.Role} | ${r.BorrowerID}</p></div>
+                        </div>
+                        <span class="text-[9px] font-mono uppercase bg-amber-900/30 text-amber-500 px-2 py-1 rounded border border-amber-800/50">Requires Clearance</span>
+                    </div>
+                    <div class="bg-neutral-900 p-2 rounded border border-neutral-800 flex justify-between items-center">
+                        <p class="text-xs font-mono text-neutral-400">Target: <span class="text-blue-400">${r.PatternID}</span></p>
+                        <p class="text-xs font-mono text-neutral-400">Req: <span class="text-white">${r.RequestedShift}</span></p>
+                    </div>
+                    <div class="flex gap-2 mt-1">
+                        <button onclick="approveTicket('${r.BorrowerID}', '${r.RequestedShift}')" class="flex-1 bg-amber-600/20 text-amber-500 border border-amber-600/50 py-2 rounded text-xs uppercase tracking-widest font-bold hover:bg-amber-600 hover:text-black transition-colors">Grant Shift</button>
+                        <button onclick="declineTicket(${r.RequestID})" class="flex-1 bg-neutral-800 text-neutral-400 border border-neutral-700 py-2 rounded text-xs uppercase tracking-widest font-bold hover:bg-neutral-700 hover:text-white transition-colors">Deny</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Populate Chronometric Monitor
+        const activePatterns = patterns.filter(p => p.Status === 'Borrowed');
+        const pList = document.getElementById('supervisor-active-list');
+        if (activePatterns.length === 0) {
+            pList.innerHTML = `<p class="text-neutral-500 font-mono text-xs text-center py-4">All assets secure.</p>`;
+        } else {
+            pList.innerHTML = activePatterns.map(p => {
+                // Determine CSS colors based on shift
+                const sColor = p.ShiftCheckout.includes('Morning') ? 'text-amber-400' : p.ShiftCheckout.includes('Afternoon') ? 'text-blue-400' : 'text-purple-400';
+                return `
+                <div class="p-3 bg-black rounded border border-neutral-800 flex flex-col gap-2">
+                    <div class="flex justify-between items-center">
+                        <p class="font-bold text-white text-sm">${p.PatternID}</p>
+                        <p class="text-[10px] font-mono ${sColor} bg-neutral-900 px-2 py-0.5 rounded border border-neutral-800">${p.ShiftCheckout}</p>
+                    </div>
+                    <div class="flex justify-between items-end border-t border-neutral-900 pt-2">
+                        <p class="text-xs text-neutral-400"><i class="ph-fill ph-user text-neutral-600"></i> ${p.BorrowedBy}</p>
+                        <div class="text-right">
+                            <p class="text-[9px] font-mono uppercase tracking-widest text-neutral-500">Shift Time Remaining</p>
+                            <p class="font-mono text-sm font-bold text-white countdown-timer" data-start="${p.CheckoutTime}">Calculating...</p>
+                        </div>
+                    </div>
+                </div>`
+            }).join('');
+            
+            // Start the NASA Chronometrics Loop
+            if(liveTimerInterval) clearInterval(liveTimerInterval);
+            liveTimerInterval = setInterval(updateChronometrics, 1000);
+            updateChronometrics(); // Run immediately once
+        }
+
+    } catch (e) { showToast("Command Sync Failed", "error"); }
+}
+
+function updateChronometrics() {
+    const timers = document.querySelectorAll('.countdown-timer');
+    const now = new Date();
+    timers.forEach(t => {
+        const start = new Date(t.dataset.start);
+        // A shift is 3 hours (10800 seconds)
+        const shiftDurationMs = 3 * 60 * 60 * 1000;
+        const endTime = new Date(start.getTime() + shiftDurationMs);
+        const diffMs = endTime - now;
+
+        if (diffMs <= 0) {
+            t.innerText = "OVERDUE"; t.classList.add('text-red-500'); t.classList.remove('text-white');
+        } else {
+            const h = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diffMs % (1000 * 60)) / 1000);
+            t.innerText = `T- ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+    });
+}
+
+async function approveTicket(borrowerId, shift) {
+    try { await fetch(`${API_BASE_URL}/borrowers/${borrowerId}/shift`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ shift }) }); showToast("Clearance Granted"); loadSupervisorDashboard(); } 
+    catch(e) { showToast("Network Error", "error"); }
+}
+async function declineTicket(reqId) {
+    try { await fetch(`${API_BASE_URL}/requests/decline`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ requestId: reqId }) }); showToast("Request Denied"); loadSupervisorDashboard(); } 
+    catch(e) { showToast("Network Error", "error"); }
 }
 
 // ==========================================
@@ -337,22 +426,22 @@ function renderAssetCard() {
 function startVerification(flowType) {
     vState = { flow: flowType, empScanned: null, isDelegate: false };
     document.getElementById('modal-title').innerText = flowType === 'borrow' ? "Checkout Protocol" : "Return Protocol";
-    document.getElementById('step-1-indicator').innerHTML = `<i class="ph ph-circle text-lg"></i> Pattern`;
-    document.getElementById('step-1-indicator').className = "flex items-center gap-1 text-slate-400";
-    document.getElementById('step-2-indicator').innerHTML = `<i class="ph ph-circle text-lg"></i> Operator`;
-    document.getElementById('step-2-indicator').className = "flex items-center gap-1 text-slate-400";
+    document.getElementById('step-1-indicator').innerHTML = `<div class="w-2 h-2 rounded-full border border-current"></div> Target`;
+    document.getElementById('step-1-indicator').className = "flex items-center gap-2 text-neutral-600";
+    document.getElementById('step-2-indicator').innerHTML = `<div class="w-2 h-2 rounded-full border border-current"></div> Operator`;
+    document.getElementById('step-2-indicator').className = "flex items-center gap-2 text-neutral-600";
     const modal = document.getElementById('verify-modal');
     modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10);
-    triggerCameraForStep("Scan physical Pattern QR", handlePatternScan, 'pattern');
+    triggerCameraForStep("Awaiting Asset QR", handlePatternScan, 'pattern');
 }
 
 function openQuickScan() {
     currentAsset = null;
     vState = { flow: null, empScanned: null, isDelegate: false };
-    document.getElementById('modal-title').innerText = "Quick Locate Asset";
+    document.getElementById('modal-title').innerText = "Quick Locate";
     document.getElementById('step-1-indicator').parentElement.classList.add('hidden');
     const m = document.getElementById('verify-modal'); m.classList.remove('hidden'); setTimeout(() => m.classList.remove('opacity-0'), 10);
-    triggerCameraForStep("Scan physical Pattern QR", handlePatternScan, 'pattern');
+    triggerCameraForStep("Awaiting Asset QR", handlePatternScan, 'pattern');
 }
 
 async function triggerCameraForStep(message, callback, targetType) {
@@ -361,28 +450,26 @@ async function triggerCameraForStep(message, callback, targetType) {
         if (targetType === 'pattern') {
             const res = await fetch(`${API_BASE_URL}/patterns`);
             const patterns = await res.json();
-            simButtons = patterns.map(p => `<button onclick="simulateScan('${p.PatternID}')" class="text-xs bg-slate-50 text-slate-600 font-bold px-3 py-2 rounded-xl hover:bg-blue-50 hover:text-blue-700 border border-slate-200 w-full text-left flex items-center gap-3 transition-all"><img src="${p.ImageUrl}" class="w-8 h-8 rounded object-cover" onerror="this.src='https://placehold.co/100x100?text=NA'"> <div class="flex-1"><span class="block">${p.PatternName}</span><span class="block text-[10px] text-slate-400 font-mono">${p.PatternID}</span></div></button>`).join('');
+            simButtons = patterns.map(p => `<button onclick="simulateScan('${p.PatternID}')" class="text-xs bg-black text-neutral-300 font-mono px-3 py-2 rounded border border-neutral-800 hover:border-blue-500 w-full text-left flex items-center gap-3 transition-all"><img src="${p.ImageUrl}" class="w-6 h-6 rounded object-cover"> <div class="flex-1"><span class="block text-white">${p.PatternID}</span><span class="block text-[9px] text-neutral-500">${p.PatternName}</span></div></button>`).join('');
         } else {
             const res = await fetch(`${API_BASE_URL}/borrowers`);
             const emps = await res.json();
-            simButtons = emps.map(e => `<button onclick="simulateScan('${e.BorrowerID}')" class="text-xs bg-slate-50 text-slate-600 font-bold px-3 py-2 rounded-xl hover:bg-blue-50 hover:text-blue-700 border border-slate-200 w-full text-left flex items-center gap-3 transition-all"><img src="${e.ImageUrl}" class="w-8 h-8 rounded-full object-cover" onerror="this.src='https://placehold.co/100x100?text=Face'"> <div class="flex-1"><span class="block">${e.FullName}</span><span class="block text-[10px] text-slate-400">${e.DesignatedShift}</span></div></button>`).join('');
+            simButtons = emps.map(e => `<button onclick="simulateScan('${e.BorrowerID}')" class="text-xs bg-black text-neutral-300 font-mono px-3 py-2 rounded border border-neutral-800 hover:border-blue-500 w-full text-left flex items-center gap-3 transition-all"><img src="${e.ImageUrl}" class="w-6 h-6 rounded-full object-cover"> <div class="flex-1"><span class="block text-white">${e.BorrowerID}</span><span class="block text-[9px] text-neutral-500">${e.FullName} | ${e.DesignatedShift}</span></div></button>`).join('');
         }
-    } catch(e) { simButtons = '<p class="text-xs text-red-500">Simulation Load Failed</p>'; }
+    } catch(e) { simButtons = '<p class="text-xs text-red-500 font-mono">Dev Sandbox Offline</p>'; }
 
     document.getElementById('modal-dynamic-area').innerHTML = `
         <div class="text-center w-full flex flex-col h-full overflow-hidden">
-            <p class="font-bold text-slate-800 mb-4 text-lg shrink-0">${message}</p>
-            <div id="camera-stream" class="w-full bg-black rounded-xl overflow-hidden shadow-inner mb-4 border border-slate-300 min-h-[200px] shrink-0"></div>
-            <div class="mt-2 pt-4 border-t border-slate-100 w-full flex-1 flex flex-col min-h-0">
-                <p class="text-[10px] uppercase font-bold text-slate-400 mb-3 text-left tracking-widest shrink-0"><i class="ph-fill ph-code"></i> Developer Simulation</p>
-                <div class="max-h-40 overflow-y-auto space-y-2 pr-1 pb-2">${simButtons}</div>
+            <p class="font-mono text-sm text-blue-400 mb-4 tracking-widest uppercase shrink-0 animate-pulse">${message}...</p>
+            <div id="camera-stream" class="w-full bg-black rounded overflow-hidden shadow-inner mb-4 border border-neutral-800 min-h-[200px] shrink-0"></div>
+            <div class="mt-2 pt-4 border-t border-neutral-800 w-full flex-1 flex flex-col min-h-0">
+                <p class="text-[9px] uppercase font-mono text-neutral-600 mb-3 text-left tracking-widest shrink-0"><i class="ph-fill ph-code"></i> Dev Override (Sandbox)</p>
+                <div class="overflow-y-auto space-y-2 pr-1 pb-2 custom-scroll flex-1">${simButtons}</div>
             </div>
         </div>
     `;
     scanner = new Html5Qrcode("camera-stream");
-    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } },
-        (text) => { stopCamera(); callback(text); }, () => {}
-    ).catch(err => console.log("Camera off"));
+    scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (text) => { stopCamera(); callback(text); }, () => {}).catch(err => console.log("Camera off"));
     window.simulateScan = function(text) { stopCamera(); callback(text); }
 }
 
@@ -394,7 +481,7 @@ async function handlePatternScan(scannedId) {
         try {
             const res = await fetch(`${API_BASE_URL}/patterns/exact/${scannedId}`);
             const data = await res.json();
-            if (!data) { closeVerifyModal(); return showToast("Pattern Not Found", "error"); }
+            if (!data) { closeVerifyModal(); return showToast("Asset Not Found", "error"); }
             currentAsset = data;
             vState.flow = currentAsset.Status === 'Available' ? 'borrow' : 'return';
             document.getElementById('modal-title').innerText = vState.flow === 'borrow' ? "Checkout Protocol" : "Return Protocol";
@@ -402,19 +489,19 @@ async function handlePatternScan(scannedId) {
             renderAssetCard();
             document.getElementById('view-tracker').classList.add('hidden');
             document.getElementById('view-asset').classList.remove('hidden');
-        } catch (err) { closeVerifyModal(); return showToast("Database error.", "error"); }
+        } catch (err) { closeVerifyModal(); return showToast("DB Link Failed", "error"); }
     } else {
-        if (scannedId !== currentAsset.PatternID) return showToast("Wrong Pattern!", "error");
+        if (scannedId !== currentAsset.PatternID) return showToast("Asset Mismatch", "error");
     }
 
-    document.getElementById('step-1-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Pattern Scanned`;
-    document.getElementById('step-1-indicator').className = "flex items-center gap-1 text-blue-600";
+    document.getElementById('step-1-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Target Lock`;
+    document.getElementById('step-1-indicator').className = "flex items-center gap-1 text-blue-500 font-mono";
     
-    if (vState.flow === 'borrow') triggerCameraForStep("Step 2: Scan Operator Badge", handleOperatorScan, 'operator');
+    if (vState.flow === 'borrow') triggerCameraForStep("Awaiting Operator QR", handleOperatorScan, 'operator');
     else {
         document.getElementById('modal-dynamic-area').innerHTML = `
-            <p class="font-bold text-slate-800 mb-6 text-center text-lg">Are you the original borrower?</p>
-            <div class="w-full space-y-3"><button onclick="vState.isDelegate=false; triggerCameraForStep('Prove Identity: Scan your badge', handleOperatorScan, 'operator')" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 shadow-lg">Yes, I am the original</button><button onclick="vState.isDelegate=true; triggerCameraForStep('Scan YOUR Badge to authorize transfer', handleOperatorScan, 'operator')" class="w-full bg-white border-2 border-slate-200 text-slate-600 font-bold py-4 rounded-xl hover:bg-slate-50">No, returning for someone else</button></div>
+            <p class="font-mono text-white mb-8 text-center text-sm tracking-wide">CONFIRM ORIGINAL BORROWER IDENTITY</p>
+            <div class="w-full space-y-4"><button onclick="vState.isDelegate=false; triggerCameraForStep('Scan Original Identity Badge', handleOperatorScan, 'operator')" class="w-full bg-blue-600 text-white font-mono text-xs uppercase tracking-widest py-4 rounded hover:bg-blue-500">I am the Original</button><button onclick="vState.isDelegate=true; triggerCameraForStep('Scan Proxy Identity Badge', handleOperatorScan, 'operator')" class="w-full bg-transparent border border-neutral-700 text-neutral-300 font-mono text-xs uppercase tracking-widest py-4 rounded hover:bg-neutral-800">I am a Proxy</button></div>
         `;
     }
 }
@@ -422,30 +509,28 @@ async function handlePatternScan(scannedId) {
 async function handleOperatorScan(scannedId) {
     try {
         const res = await fetch(`${API_BASE_URL}/borrowers/${scannedId}`);
-        if (!res.ok) return showToast("Invalid Badge", "error");
+        if (!res.ok) return showToast("Identity Invalid", "error");
         const emp = await res.json();
         vState.empScanned = emp.BorrowerID;
-        document.getElementById('step-2-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Authorized`;
-        document.getElementById('step-2-indicator').className = "flex items-center gap-1 text-blue-600";
+        document.getElementById('step-2-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Identity Confirmed`;
+        document.getElementById('step-2-indicator').className = "flex items-center gap-1 text-blue-500 font-mono";
         
         if (vState.flow === 'borrow') {
-            const exactDateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             document.getElementById('modal-dynamic-area').innerHTML = `
-                <div class="bg-blue-50 p-4 rounded-xl w-full mb-6 border border-blue-100 flex items-center gap-4">
-                    <img src="${emp.ImageUrl}" class="w-12 h-12 rounded-full object-cover shadow-sm" onerror="this.src='https://placehold.co/100x100?text=Face'">
-                    <div><p class="text-[10px] font-bold uppercase text-blue-600 tracking-widest mb-1">Badge Scanned</p><p class="font-bold text-slate-800 leading-none">${emp.FullName}</p><p class="text-[10px] text-slate-500 mt-1">${emp.DesignatedShift}</p></div>
+                <div class="bg-black p-4 rounded border border-neutral-800 w-full mb-8 flex items-center gap-4">
+                    <img src="${emp.ImageUrl}" class="w-12 h-12 rounded-full object-cover" onerror="this.src='https://placehold.co/100?text=Face'">
+                    <div><p class="text-[9px] font-mono uppercase text-blue-500 tracking-widest mb-1">Identity Lock</p><p class="font-bold text-white text-sm leading-none">${emp.FullName}</p><p class="text-[10px] font-mono text-neutral-500 mt-1">${emp.DesignatedShift}</p></div>
                 </div>
-                <div class="w-full text-left mb-6"><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Target Date</p><p class="font-bold text-lg text-slate-800">${exactDateStr}</p></div>
-                <p class="font-bold text-slate-800 mb-2 w-full text-left">Confirm Requested Shift Checkout</p>
-                <select id="final-shift-select" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none mb-8">
-                    <option value="Shift A (Morning)">Shift A (Morning)</option><option value="Shift B (Afternoon)">Shift B (Afternoon)</option><option value="Shift C (Evening)">Shift C (Evening)</option>
+                <p class="font-mono text-neutral-400 text-xs mb-2 w-full text-left uppercase tracking-widest">Select Target Shift</p>
+                <select id="final-shift-select" class="w-full p-4 bg-black border border-neutral-800 rounded font-mono text-sm text-white outline-none mb-8 focus:border-blue-500">
+                    <option value="Shift A (Morning)">Shift A (Morning) [0600 - 0900]</option><option value="Shift B (Afternoon)">Shift B (Afternoon) [1200 - 1500]</option><option value="Shift C (Evening)">Shift C (Evening) [1800 - 2100]</option>
                 </select>
-                <button onclick="processFinalBorrow()" class="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-slate-800 flex justify-center items-center gap-2">Request Overwatch Approval <i class="ph ph-shield-check text-xl"></i></button>
+                <button onclick="processFinalBorrow()" class="w-full bg-blue-600 text-white font-mono text-xs uppercase tracking-widest py-4 rounded hover:bg-blue-500 flex justify-center items-center gap-2">Execute Command <i class="ph ph-terminal-window text-lg"></i></button>
             `;
         } else {
             processFinalReturn(); 
         }
-    } catch (err) { showToast("Error verifying operator.", "error"); }
+    } catch (err) { showToast("Identity Verification Failed", "error"); }
 }
 
 async function processFinalBorrow() {
@@ -458,38 +543,37 @@ async function processFinalBorrow() {
         const data = await res.json();
         
         if (!res.ok) {
-            // OVERWATCH BLOCK TRIGGERED
+            // OVERWATCH BLOCK
+            const isTicket = data.type === "PENDING";
             document.getElementById('modal-dynamic-area').innerHTML = `
                 <div class="flex flex-col items-center py-6 w-full fade-in text-center">
-                    <i class="ph-fill ph-warning-circle text-6xl text-red-600 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Access Denied</h2>
-                    <p class="text-sm text-red-600 mb-8 font-bold border border-red-200 bg-red-50 p-4 rounded-xl">${data.error}</p>
-                    <button onclick="closeVerifyModal()" class="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 shadow-lg">Acknowledge</button>
+                    <i class="ph-fill ${isTicket ? 'ph-clock text-amber-500' : 'ph-warning-octagon text-red-500'} text-6xl mb-6"></i>
+                    <h2 class="text-xl font-mono text-white mb-2 uppercase tracking-widest">${isTicket ? 'Clearance Required' : 'Access Denied'}</h2>
+                    <p class="text-xs font-mono ${isTicket ? 'text-amber-400 border-amber-900/50 bg-amber-950/20' : 'text-red-400 border-red-900/50 bg-red-950/20'} border p-4 rounded mb-8 tracking-wide leading-relaxed">${data.error}</p>
+                    <button onclick="closeVerifyModal()" class="w-full bg-neutral-800 text-white font-mono py-3 rounded hover:bg-neutral-700 text-xs uppercase tracking-widest">Acknowledge</button>
                 </div>
             `;
-        } else {
-            showSuccessScreen("Checkout Approved by Overwatch");
-        }
-    } catch (e) { showToast("Network error", "error"); }
+        } else { showSuccessScreen("Checkout Confirmed"); }
+    } catch (e) { showToast("Command execution failed", "error"); }
 }
 
 async function processFinalReturn() {
-    try {
-        await fetch(`${API_BASE_URL}/patterns/return`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patternId: currentAsset.PatternID, returningBorrowerId: vState.empScanned }) });
-        showSuccessScreen("Return Processed Successfully");
-    } catch (e) { showToast("Database error", "error"); }
+    try { await fetch(`${API_BASE_URL}/patterns/return`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patternId: currentAsset.PatternID }) }); showSuccessScreen("Return Processed"); } 
+    catch (e) { showToast("Command execution failed", "error"); }
 }
 
 function showSuccessScreen(title) {
     document.getElementById('modal-dynamic-area').innerHTML = `
         <div class="flex flex-col items-center py-6 w-full fade-in text-center">
-            <i class="ph-fill ph-check-circle text-6xl text-emerald-500 mb-4"></i><h2 class="text-2xl font-bold text-slate-800 mb-2 text-balance">${title}</h2><p class="text-sm text-slate-500 mb-8 font-medium">Redirecting in <span id="sec-text" class="font-bold text-blue-600">5</span>s...</p>
-            <div class="flex gap-3 w-full"><button onclick="clearTimerAndStay()" class="flex-1 bg-slate-100 text-slate-600 font-bold py-4 rounded-xl hover:bg-slate-200">Stay Here</button><button onclick="executeRedirect()" class="flex-1 bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 shadow-lg">Done</button></div>
+            <i class="ph-fill ph-check-circle text-6xl text-blue-500 mb-6 shadow-blue-500/20 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"></i>
+            <h2 class="text-lg font-mono text-white mb-2 uppercase tracking-widest">${title}</h2>
+            <p class="text-[10px] font-mono text-neutral-500 mb-8 uppercase tracking-widest">Link terminating in <span id="sec-text" class="text-blue-400">5</span>s...</p>
+            <div class="flex gap-3 w-full"><button onclick="clearTimerAndStay()" class="flex-1 bg-transparent border border-neutral-700 text-neutral-400 font-mono text-xs uppercase py-3 rounded hover:bg-neutral-800 hover:text-white transition-colors">Hold Connection</button><button onclick="executeRedirect()" class="flex-1 bg-blue-600 text-white font-mono text-xs uppercase py-3 rounded hover:bg-blue-500 transition-colors">Terminate</button></div>
         </div>
     `;
     let timeLeft = 5;
     window.redirectTimer = setInterval(() => { timeLeft--; const el = document.getElementById('sec-text'); if(el) el.innerText = timeLeft; if (timeLeft <= 0) executeRedirect(); }, 1000);
 }
 
-function clearTimerAndStay() { clearInterval(window.redirectTimer); closeVerifyModal(); selectPattern(currentAsset.PatternID); }
+function clearTimerAndStay() { clearInterval(window.redirectTimer); closeVerifyModal(); selectAsset(currentAsset.PatternID); }
 function executeRedirect() { clearInterval(window.redirectTimer); closeVerifyModal(); navTo('tracker'); }

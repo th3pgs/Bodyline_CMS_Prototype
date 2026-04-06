@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://bodyline-cms-api.onrender.com/api'; 
+const API_BASE_URL = 'https://bodyline-cms-api.onrender.com/api'; // CRITICAL: CHANGE THIS
 let scanner = null; 
 let currentAsset = null; 
 let vState = { flow: null, empScanned: null };
@@ -8,10 +8,9 @@ let calendarWeekOffset = 0;
 
 // ==========================================
 // 1. BOOT SEQUENCE & ROUTING
-// ========================================
-
-
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('mutex-bar').classList.add('hidden'); // Force hide on boot
     startNasaClock();
     fetchAndPopulateSettings();
 });
@@ -104,7 +103,7 @@ async function loadAuditLog() {
     } catch (e) { }
 }
 
-// REGISTER ASSETS & BORROWERS (Truncated for space, identical to previous logic but hitting new DB)
+// REGISTER ASSETS & BORROWERS
 async function registerAsset() {
     const name = document.getElementById('reg-name').value; const brandDd = document.getElementById('reg-brand'); const brand = brandDd.value; const prefix = brandDd.options[brandDd.selectedIndex]?.dataset.prefix || 'PAT';
     const style = document.getElementById('reg-style').value; const size = document.getElementById('reg-size').value; const rackL = document.getElementById('reg-rack-l').value; const rackP = document.getElementById('reg-rack-p').value; const imgUrl = document.getElementById('reg-img').value || 'https://placehold.co/400x400/171717/ffffff?text=No+Image';
@@ -208,7 +207,7 @@ async function selectAsset(id) {
                         <div class="bg-black p-4 rounded border border-neutral-800 col-span-2"><p class="text-[10px] text-neutral-500 font-mono uppercase tracking-widest">Size Category</p><p class="font-bold text-neutral-200">${currentAsset.SizeCategory}</p></div>
                     </div>
         `;
-        if (isAvail || isLocked) { // Allow initiation even if locked, server will block if it's someone else's lock
+        if (isAvail || isLocked) { 
             html += `<button onclick="startVerification('borrow')" class="w-full ${isLocked ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500'} text-white font-bold py-4 rounded text-sm tracking-widest uppercase flex items-center justify-center gap-2 transition-colors"><i class="ph ph-qr-code text-xl"></i> Initiate Checkout Sequence</button>`;
         } else {
             html += `<div class="bg-neutral-800 p-4 rounded border border-neutral-700 mb-6 flex justify-between items-center"><div class="flex flex-col"><p class="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">Active Operator</p><p class="font-bold text-white mt-1">${currentAsset.BorrowedBy}</p></div><div class="text-right"><p class="text-[10px] font-mono text-neutral-400 uppercase tracking-widest">Shift Check</p><p class="font-bold text-blue-400 mt-1">${currentAsset.ShiftCheckout}</p></div></div>
@@ -231,25 +230,21 @@ async function loadSupervisorDashboard() {
         const assignments = await assignRes.json();
         const requests = await reqsRes.json();
 
-        // 1. Build the Unassigned Pool (Operators not working today)
+        // 1. Build the Unassigned Pool
         const todayStr = new Date().toISOString().split('T')[0];
         const assignedToday = assignments.filter(a => a.AssignedDate.split('T')[0] === todayStr).map(a => a.BorrowerID);
         const pool = allBorrowers.filter(b => !assignedToday.includes(b.BorrowerID));
         
         document.getElementById('operator-pool').innerHTML = pool.map(b => `
-            <div class="operator-card bg-black border border-neutral-800 rounded p-2 flex items-center gap-2 shadow hover:border-blue-500" draggable="true" ondragstart="dragStart(event, '${b.BorrowerID}')">
+            <div class="operator-card bg-black border border-neutral-800 rounded p-2 flex items-center gap-2 shadow hover:border-blue-500 cursor-grab active:cursor-grabbing active:opacity-50" draggable="true" ondragstart="dragStart(event, '${b.BorrowerID}')">
                 <img src="${b.ImageUrl}" class="w-8 h-8 rounded-full object-cover pointer-events-none" onerror="this.src='https://placehold.co/100?text=Face'">
                 <div class="pointer-events-none"><p class="text-[10px] font-bold text-white leading-tight">${b.FullName.split(' ')[0]}</p><p class="text-[8px] font-mono text-neutral-500">${b.BorrowerID}</p></div>
             </div>
         `).join('') || '<p class="text-neutral-500 text-xs font-mono w-full p-2">Pool Empty</p>';
 
-        // 2. Build 7-Day Calendar Grid
-        const grid = document.getElementById('calendar-grid');
-        grid.innerHTML = '';
-        
-        // Calculate dates for the week
-        const now = new Date();
-        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1 + (calendarWeekOffset * 7))); // Monday start
+        // 2. Build Calendar Grid
+        const grid = document.getElementById('calendar-grid'); grid.innerHTML = '';
+        const now = new Date(); const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1 + (calendarWeekOffset * 7)));
         document.getElementById('calendar-week-label').innerText = `Week of ${startOfWeek.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
 
         const shifts = ['Morning [06:00]', 'Afternoon [14:00]', 'Night [22:00]'];
@@ -265,20 +260,16 @@ async function loadSupervisorDashboard() {
             shifts.forEach((shiftName, idx) => {
                 const shiftKey = shiftKeys[idx];
                 const dayAssignments = assignments.filter(a => a.AssignedDate.split('T')[0] === dateStr && a.ShiftType === shiftKey);
-                
                 colHtml += `
-                    <div class="drop-zone flex-1 bg-black rounded border border-neutral-800 border-dashed p-2 min-h-[100px] flex flex-col gap-1" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event, '${dateStr}', '${shiftKey}')">
+                    <div class="drop-zone flex-1 bg-black rounded border border-neutral-800 border-dashed p-2 min-h-[100px] flex flex-col gap-1 transition-colors duration-200" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event, '${dateStr}', '${shiftKey}')">
                         <p class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest mb-1 text-center">${shiftName}</p>
-                        ${dayAssignments.map(a => {
-                            const b = allBorrowers.find(x => x.BorrowerID === a.BorrowerID);
-                            return b ? `<div class="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-[9px] font-mono text-white flex items-center gap-2"><img src="${b.ImageUrl}" class="w-4 h-4 rounded-full"> ${b.FullName.split(' ')[0]}</div>` : '';
-                        }).join('')}
+                        ${dayAssignments.map(a => { const b = allBorrowers.find(x => x.BorrowerID === a.BorrowerID); return b ? `<div class="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-[9px] font-mono text-white flex items-center gap-2"><img src="${b.ImageUrl}" class="w-4 h-4 rounded-full"> ${b.FullName.split(' ')[0]}</div>` : ''; }).join('')}
                     </div>`;
             });
             grid.innerHTML += colHtml + `</div>`;
         }
 
-        // 3. Populate Ticketing Queue
+        // 3. Populate Tickets
         const qList = document.getElementById('supervisor-queue-list');
         const pendingReqs = requests.filter(r => r.RequestStatus === 'Pending');
         qList.innerHTML = pendingReqs.map(r => `
@@ -292,14 +283,13 @@ async function loadSupervisorDashboard() {
     } catch (e) { showToast("Dashboard Sync Failed", "error"); }
 }
 
-// Drag and Drop Handlers
-function dragStart(e, borrowerId) { e.dataTransfer.setData('text/plain', borrowerId); e.target.style.opacity = '0.5'; }
-function dragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
-function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+// Drag Handlers
+function dragStart(e, borrowerId) { e.dataTransfer.setData('text/plain', borrowerId); }
+function dragOver(e) { e.preventDefault(); e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'; e.currentTarget.style.borderColor = '#3b82f6'; }
+function dragLeave(e) { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderColor = ''; }
 async function drop(e, dateStr, shift) {
-    e.preventDefault(); e.currentTarget.classList.remove('drag-over');
-    const borrowerId = e.dataTransfer.getData('text/plain');
-    if (!borrowerId) return;
+    e.preventDefault(); e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderColor = '';
+    const borrowerId = e.dataTransfer.getData('text/plain'); if (!borrowerId) return;
     try { await fetch(`${API_BASE_URL}/assignments`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ borrowerId, date: dateStr, shift }) }); loadSupervisorDashboard(); } 
     catch(err) { showToast("Assignment Failed", "error"); }
 }
@@ -335,4 +325,131 @@ async function triggerCameraForStep(message, callback, targetType) {
     } catch(e) { simButtons = '<p class="text-xs text-red-500 font-mono">Sandbox Offline</p>'; }
 
     document.getElementById('modal-dynamic-area').innerHTML = `<div class="text-center w-full flex flex-col h-full overflow-hidden"><p class="font-mono text-sm text-blue-400 mb-4 tracking-widest uppercase shrink-0 animate-pulse">${message}...</p><div id="camera-stream" class="w-full bg-black rounded overflow-hidden shadow-inner mb-4 border border-neutral-800 min-h-[200px] shrink-0"></div><div class="mt-2 pt-4 border-t border-neutral-800 w-full flex-1 flex flex-col min-h-0"><p class="text-[9px] uppercase font-mono text-neutral-600 mb-3 text-left tracking-widest shrink-0"><i class="ph-fill ph-code"></i> Dev Sandbox Override</p><div class="overflow-y-auto space-y-2 pr-1 pb-2 custom-scroll flex-1">${simButtons}</div></div></div>`;
-    scanner = new Html5Qrcode("camera-stream"); scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: {
+    scanner = new Html5Qrcode("camera-stream"); scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (text) => { stopCamera(); callback(text); }, () => {}).catch(err => console.log("Camera off")); window.simulateScan = function(text) { stopCamera(); callback(text); }
+}
+
+function stopCamera() { if (scanner && scanner.isScanning) scanner.stop(); }
+function closeVerifyModal() { stopCamera(); document.getElementById('verify-modal').classList.add('opacity-0'); setTimeout(() => document.getElementById('verify-modal').classList.add('hidden'), 300); }
+
+async function handlePatternScan(scannedId) {
+    if (!currentAsset) {
+        try {
+            const res = await fetch(`${API_BASE_URL}/patterns/exact/${scannedId}`); const data = await res.json();
+            if (!data) { closeVerifyModal(); return showToast("Asset Not Found", "error"); }
+            currentAsset = data; vState.flow = currentAsset.Status === 'Available' || currentAsset.Status === 'Locked_Pending' ? 'borrow' : 'return';
+            document.getElementById('modal-title').innerText = vState.flow === 'borrow' ? "Checkout Protocol" : "Return Protocol";
+            document.getElementById('step-1-indicator').parentElement.classList.remove('hidden'); renderAssetCard();
+        } catch (err) { closeVerifyModal(); return showToast("DB Link Failed", "error"); }
+    } else { if (scannedId !== currentAsset.PatternID) return showToast("Asset Mismatch", "error"); }
+
+    document.getElementById('step-1-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Target Lock`; document.getElementById('step-1-indicator').className = "flex items-center gap-1 text-blue-500 font-mono";
+    if (vState.flow === 'borrow') triggerCameraForStep("Awaiting Operator QR", handleOperatorScan, 'operator');
+    else { document.getElementById('modal-dynamic-area').innerHTML = `<p class="font-mono text-white mb-8 text-center text-sm tracking-wide">CONFIRM RETURN IDENTITY</p><button onclick="triggerCameraForStep('Scan Operator Badge', handleOperatorScan, 'operator')" class="w-full bg-blue-600 text-white font-mono text-xs uppercase tracking-widest py-4 rounded hover:bg-blue-500">Scan Return Badge</button>`; }
+}
+
+async function handleOperatorScan(scannedId) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/borrowers/${scannedId}`); if (!res.ok) return showToast("Identity Invalid", "error");
+        const emp = await res.json(); vState.empScanned = emp.BorrowerID;
+        document.getElementById('step-2-indicator').innerHTML = `<i class="ph-fill ph-check-circle text-lg"></i> Identity Confirmed`; document.getElementById('step-2-indicator').className = "flex items-center gap-1 text-blue-500 font-mono";
+        
+        if (vState.flow === 'borrow') {
+            document.getElementById('modal-dynamic-area').innerHTML = `
+                <div class="bg-black p-4 rounded border border-neutral-800 w-full mb-8 flex items-center gap-4"><img src="${emp.ImageUrl}" class="w-12 h-12 rounded-full object-cover"><div class="flex-1"><p class="text-[9px] font-mono uppercase text-blue-500 tracking-widest mb-1">Identity Lock</p><p class="font-bold text-white text-sm leading-none">${emp.FullName}</p></div></div>
+                <p class="font-mono text-neutral-400 text-xs mb-2 w-full text-left uppercase tracking-widest">Select Target Shift</p>
+                <select id="final-shift-select" class="w-full p-4 bg-black border border-neutral-800 rounded font-mono text-sm text-white outline-none mb-8 focus:border-blue-500">
+                    <option value="Morning">Morning [06:00 - 14:00]</option><option value="Afternoon">Afternoon [14:00 - 22:00]</option><option value="Night">Night [22:00 - 06:00]</option>
+                </select>
+                <button onclick="processFinalBorrow()" class="w-full bg-blue-600 text-white font-mono text-xs uppercase tracking-widest py-4 rounded hover:bg-blue-500 flex justify-center items-center gap-2">Execute Command <i class="ph ph-terminal-window text-lg"></i></button>
+            `;
+        } else { processFinalReturn(); }
+    } catch (err) { showToast("Verification Failed", "error"); }
+}
+
+async function processFinalBorrow() {
+    const shift = document.getElementById('final-shift-select').value;
+    const dateStr = new Date().toISOString().split('T')[0]; // Today
+    try {
+        const res = await fetch(`${API_BASE_URL}/patterns/borrow`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patternId: currentAsset.PatternID, borrowerId: vState.empScanned, requestedShift: shift, requestedDate: dateStr }) });
+        const data = await res.json();
+        
+        if (!res.ok) {
+            if (data.type === "PENDING") {
+                // TRIGGER MUTEX LOCK BAR
+                closeVerifyModal();
+                showToast("Mutex Lock Engaged. Ticket Sent.", "success");
+                document.getElementById('mutex-msg').innerText = `Awaiting Clearance for ${currentAsset.PatternID}...`;
+                document.getElementById('mutex-bar').classList.remove('hidden'); // Force show
+                startMutexPolling(vState.empScanned, currentAsset.PatternID, shift, dateStr);
+            } else {
+                document.getElementById('modal-dynamic-area').innerHTML = `<div class="flex flex-col items-center py-6 w-full fade-in text-center"><i class="ph-fill ph-warning-octagon text-red-500 text-6xl mb-6"></i><h2 class="text-xl font-mono text-white mb-2 uppercase tracking-widest">Access Denied</h2><p class="text-xs font-mono text-red-400 border border-red-900/50 bg-red-950/20 p-4 rounded mb-8 tracking-wide leading-relaxed">${data.error}</p><button onclick="closeVerifyModal()" class="w-full bg-neutral-800 text-white font-mono py-3 rounded hover:bg-neutral-700 text-xs uppercase tracking-widest">Acknowledge</button></div>`;
+            }
+        } else { showSuccessScreen("Checkout Confirmed"); }
+    } catch (e) { showToast("Command failed", "error"); }
+}
+
+async function processFinalReturn() { try { await fetch(`${API_BASE_URL}/patterns/return`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patternId: currentAsset.PatternID }) }); showSuccessScreen("Return Processed"); } catch (e) { showToast("Return failed", "error"); } }
+
+function showSuccessScreen(title) {
+    document.getElementById('modal-dynamic-area').innerHTML = `<div class="flex flex-col items-center py-6 w-full fade-in text-center"><i class="ph-fill ph-check-circle text-6xl text-blue-500 mb-6 shadow-blue-500/20 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]"></i><h2 class="text-lg font-mono text-white mb-2 uppercase tracking-widest">${title}</h2><p class="text-[10px] font-mono text-neutral-500 mb-8 uppercase tracking-widest">Link terminating in <span id="sec-text" class="text-blue-400">3</span>s...</p></div>`;
+    let timeLeft = 3; window.redirectTimer = setInterval(() => { timeLeft--; const el = document.getElementById('sec-text'); if(el) el.innerText = timeLeft; if (timeLeft <= 0) { clearInterval(window.redirectTimer); closeVerifyModal(); navTo('tracker'); } }, 1000);
+}
+
+// ==========================================
+// 7. MUTEX POLLING (The VS Code Bottom Bar)
+// ==========================================
+function startMutexPolling(borrowerId, patternId, shift, dateStr) {
+    let timeLeft = 15 * 60; // 15 minutes
+    const timerEl = document.getElementById('mutex-timer');
+    const actionBtn = document.getElementById('mutex-action-btn');
+    
+    actionBtn.classList.add('hidden'); actionBtn.onclick = null;
+    timerEl.classList.remove('text-green-400', 'text-red-500'); timerEl.classList.add('text-white');
+
+    if(mutexPollInterval) clearInterval(mutexPollInterval);
+
+    mutexPollInterval = setInterval(async () => {
+        timeLeft--;
+        const m = Math.floor(timeLeft / 60); const s = timeLeft % 60;
+        timerEl.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+        if (timeLeft <= 0) {
+            clearInterval(mutexPollInterval);
+            timerEl.innerText = "EXPIRED"; timerEl.classList.add('text-red-500');
+            setTimeout(() => { document.getElementById('mutex-bar').classList.add('hidden'); loadTrackerGrid(); }, 3000);
+            return;
+        }
+
+        if (timeLeft % 3 === 0) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/requests/status?borrowerId=${borrowerId}&patternId=${patternId}`);
+                const data = await res.json();
+                
+                if (data.RequestStatus === 'Approved') {
+                    clearInterval(mutexPollInterval);
+                    timerEl.innerText = "CLEARED"; timerEl.classList.replace('text-white', 'text-green-400');
+                    document.querySelector('.ph-spinner').classList.replace('ph-spinner', 'ph-check-circle');
+                    document.querySelector('.ph-check-circle').classList.remove('animate-spin');
+                    document.querySelector('.ph-check-circle').classList.replace('text-blue-400', 'text-green-400');
+                    document.getElementById('mutex-msg').innerText = "Supervisor Authorized. Awaiting Execution.";
+                    
+                    actionBtn.classList.remove('hidden');
+                    actionBtn.onclick = async () => {
+                        await fetch(`${API_BASE_URL}/patterns/borrow`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patternId, borrowerId, requestedShift: shift, requestedDate: dateStr }) });
+                        document.getElementById('mutex-bar').classList.add('hidden');
+                        showToast("Checkout Finalized", "success");
+                        loadTrackerGrid();
+                    };
+                } else if (data.RequestStatus === 'Declined') {
+                    clearInterval(mutexPollInterval);
+                    timerEl.innerText = "DENIED"; timerEl.classList.replace('text-white', 'text-red-500');
+                    setTimeout(() => document.getElementById('mutex-bar').classList.add('hidden'), 3000);
+                }
+            } catch(e) {}
+        }
+    }, 1000);
+}
+
+function finalizeMutexCheckout() {
+    // Failsafe in case button is clicked early
+}

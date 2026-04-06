@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bodyline CMS</title>
+    <title>Bodyline Overwatch</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -11,115 +11,179 @@
     <link rel="stylesheet" href="style.css">
     <script src="app.js" defer></script>
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col font-sans relative">
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col font-sans relative overflow-hidden">
 
-    <header id="main-header" class="p-4 bg-white flex justify-between items-center text-sm font-medium text-slate-600 border-b border-slate-200 shadow-sm z-20">
-        <div class="flex gap-6">
-            <button onclick="showAdminAuth()" class="hover:text-blue-600 font-bold flex items-center gap-2"><i class="ph ph-shield-check text-lg"></i> Admin Console</button>
+    <main id="view-gateway" class="absolute inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-4 fade-in">
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold tracking-tighter text-white flex items-center justify-center gap-3">
+                <i class="ph-fill ph-crosshair text-blue-500"></i> OVERWATCH
+            </h1>
+            <p class="text-slate-400 mt-2 font-medium tracking-widest uppercase text-xs">Bodyline Enterprise Resource Planning</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+            <button onclick="navTo('tracker')" class="group bg-slate-800 border border-slate-700 hover:border-blue-500 p-10 rounded-3xl text-left transition-all hover:bg-slate-800/80 hover:shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+                <i class="ph-fill ph-scanner text-5xl text-blue-400 mb-4 block group-hover:scale-110 transition-transform"></i>
+                <h2 class="text-2xl font-bold text-white mb-2">Asset Tracker</h2>
+                <p class="text-slate-400 text-sm">Physical operations, pattern checkout, and location searching.</p>
+            </button>
+            <button onclick="navTo('supervisor-auth')" class="group bg-slate-800 border border-slate-700 hover:border-amber-500 p-10 rounded-3xl text-left transition-all hover:bg-slate-800/80 hover:shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+                <i class="ph-fill ph-shield-star text-5xl text-amber-400 mb-4 block group-hover:scale-110 transition-transform"></i>
+                <h2 class="text-2xl font-bold text-white mb-2">Supervisor Portal</h2>
+                <p class="text-slate-400 text-sm">Command dashboard, shift management, and active monitors.</p>
+            </button>
+        </div>
+    </main>
+
+    <header id="main-header" class="hidden p-4 bg-white flex justify-between items-center text-sm font-medium text-slate-600 border-b border-slate-200 shadow-sm z-20">
+        <div class="flex gap-4">
+            <button onclick="navTo('gateway')" class="hover:text-slate-900 font-bold flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg"><i class="ph ph-squares-four"></i> Gateway</button>
+            <button id="btn-admin-auth" onclick="navTo('admin-auth')" class="hover:text-blue-600 font-bold flex items-center gap-2"><i class="ph ph-shield-check text-lg"></i> Admin Console</button>
         </div>
         <div class="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-full font-bold text-blue-800">
             <i class="ph ph-calendar-blank"></i> <span id="current-date-display"></span>
         </div>
     </header>
 
-    <main id="view-home" class="flex-1 flex flex-col items-center justify-center p-4 relative fade-in">
-        <div class="mb-8 text-center">
-            <h1 class="text-6xl font-bold tracking-tighter text-slate-800 flex items-center justify-center gap-3">
-                <i class="ph-fill ph-scissors text-blue-600"></i> CMS
-            </h1>
-            <p class="text-slate-500 mt-2 font-medium tracking-widest uppercase text-xs">Bodyline Asset Tracker</p>
-        </div>
-
-        <div class="w-full max-w-2xl relative z-10">
-            <div class="relative flex items-center w-full h-14 rounded-full google-shadow bg-white hover:bg-white focus-within:bg-white focus-within:shadow-md transition-all">
+    <main id="view-tracker" class="hidden flex-1 flex-col items-center justify-center p-4 relative fade-in h-full">
+        <div class="w-full max-w-2xl relative z-10 mt-20 mx-auto">
+            <div class="mb-8 text-center"><h1 class="text-4xl font-bold text-slate-800"><i class="ph-fill ph-scissors text-blue-600"></i> Operations Tracker</h1></div>
+            <div class="relative flex items-center w-full h-14 rounded-full google-shadow bg-white hover:bg-white focus-within:shadow-md transition-all">
                 <i class="ph ph-magnifying-glass absolute left-5 text-xl text-slate-400"></i>
-                <input type="text" id="searchInput" autocomplete="off" placeholder="Search patterns by Name or ID..." class="w-full h-full bg-transparent pl-14 pr-12 outline-none text-lg text-slate-700">
+                <input type="text" id="searchInput" autocomplete="off" placeholder="Search physical assets..." class="w-full h-full bg-transparent pl-14 pr-12 outline-none text-lg text-slate-700">
                 <button onclick="clearSearch()" id="clearBtn" class="absolute right-4 text-slate-400 hover:text-slate-600 hidden"><i class="ph ph-x text-xl"></i></button>
             </div>
             <div id="autocomplete-dropdown" class="absolute w-full bg-white mt-2 rounded-2xl shadow-xl border border-slate-100 hidden flex flex-col py-2 max-h-80 overflow-y-auto z-50"></div>
         </div>
-
         <button onclick="openQuickScan()" class="absolute bottom-10 right-10 bg-blue-600 text-white h-16 w-16 rounded-full shadow-2xl hover:bg-blue-700 hover:scale-105 transition-all flex items-center justify-center group">
             <i class="ph ph-qr-code text-3xl group-hover:animate-pulse"></i>
         </button>
     </main>
 
-    <main id="view-asset" class="hidden flex-1 flex flex-col items-center justify-start p-4 pt-12 fade-in relative overflow-y-auto">
-        <button onclick="goHome()" class="absolute top-6 left-6 text-slate-500 hover:text-slate-800 flex items-center gap-2 font-bold bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200"><i class="ph ph-arrow-left text-xl"></i> Back</button>
-        <div id="asset-card-container" class="w-full max-w-2xl mt-10"></div>
+    <main id="view-asset" class="hidden flex-1 flex-col items-center justify-start p-4 pt-8 fade-in relative overflow-y-auto w-full h-full">
+        <button onclick="navTo('tracker')" class="absolute top-4 left-6 text-slate-500 hover:text-slate-800 flex items-center gap-2 font-bold bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200"><i class="ph ph-arrow-left text-xl"></i> Back</button>
+        <div id="asset-card-container" class="w-full max-w-2xl mt-12 mx-auto pb-10"></div>
     </main>
 
-    <main id="view-admin" class="hidden flex-1 flex flex-col p-8 fade-in overflow-y-auto relative">
-        <button onclick="promptLogout()" class="absolute top-8 right-8 text-red-600 hover:text-red-800 flex items-center gap-2 font-bold bg-red-50 px-4 py-2 rounded-xl border border-red-200 shadow-sm"><i class="ph ph-sign-out text-xl"></i> Log Out Admin</button>
-        <h2 class="text-3xl font-bold text-slate-800 mb-8 mt-2"><i class="ph ph-shield-check text-blue-600"></i> Administration Console</h2>
-        
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl w-full mx-auto">
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h3 class="font-bold text-lg mb-4 border-b pb-2">Register Asset Block</h3>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <input type="text" id="reg-name" placeholder="Pattern Name" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    <input type="text" id="reg-style" placeholder="Style No. (e.g. BL-01)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    <input type="text" id="reg-loc" placeholder="Location (Rack B-05)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    <select id="reg-size" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700">
-                        <option value="XS - S">Size: XS - S</option><option value="M - L">Size: M - L</option><option value="XL - XXL">Size: XL - XXL</option>
-                    </select>
-                </div>
-                <input type="text" id="reg-img" placeholder="Image URL (Paste from Imgur/Drive)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-6 outline-none font-medium">
-                
-                <button onclick="registerAsset()" class="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all">Generate Asset QR</button>
-                <div id="admin-qr-output-pattern" class="mt-6 hidden flex flex-col items-center fade-in">
-                    <div id="print-zone-pattern" class="p-6 bg-white border-4 border-slate-800 rounded-2xl inline-block text-center mb-4">
-                        <div id="qrcode-image-pattern" class="mx-auto flex justify-center bg-white p-2"></div>
-                        <p id="qr-text-pattern" class="mt-4 font-mono font-bold tracking-widest text-xl text-slate-800"></p>
+    <main id="view-supervisor" class="hidden flex-1 flex-col p-6 bg-slate-50 fade-in overflow-y-auto h-full">
+        <div class="max-w-7xl mx-auto w-full">
+            <h2 class="text-3xl font-bold text-slate-800 mb-6 flex items-center gap-3"><i class="ph-fill ph-shield-star text-amber-500"></i> Command Dashboard</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2 text-slate-800">Shift Assignments & Clearances</h3>
+                    <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl mb-4 text-sm text-amber-800 font-medium flex items-center gap-2">
+                        <i class="ph-fill ph-warning-circle text-amber-600 text-lg"></i> UNASSIGNED operators cannot checkout assets.
                     </div>
-                    <button onclick="printQR('print-zone-pattern')" class="bg-blue-100 text-blue-700 font-bold px-8 py-3 rounded-full hover:bg-blue-200 flex gap-2"><i class="ph ph-printer text-xl"></i> Print Label</button>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h3 class="font-bold text-lg mb-4 border-b pb-2">Register Operator</h3>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <input type="text" id="reg-emp-name" placeholder="Operator Name" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    <input type="text" id="reg-emp-contact" placeholder="Contact/Ext No." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
-                    <select id="reg-emp-dept" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700">
-                        <option value="Cutting Dept">Cutting Dept</option><option value="Molding Dept">Molding Dept</option><option value="QC Dept">QC Dept</option>
-                    </select>
-                    <select id="reg-emp-role" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700">
-                        <option value="Block Handler">Block Handler</option><option value="Machine Operator">Machine Operator</option><option value="Supervisor">Supervisor</option>
-                    </select>
-                </div>
-                <input type="text" id="reg-emp-img" placeholder="Face Image URL (Optional)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-6 outline-none font-medium">
-                
-                <button onclick="registerOperator()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all">Generate Badge QR</button>
-                <div id="admin-qr-output-emp" class="mt-6 hidden flex flex-col items-center fade-in">
-                    <div id="print-zone-emp" class="p-6 bg-blue-50 border-4 border-blue-600 rounded-2xl inline-block text-center mb-4">
-                        <div id="qrcode-image-emp" class="mx-auto flex justify-center bg-white p-2"></div>
-                        <p id="qr-text-emp" class="mt-4 font-mono font-bold text-blue-900 tracking-widest text-xl"></p>
+                    <div id="supervisor-borrowers-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                        <p class="text-slate-400 text-sm text-center py-4">Loading operators...</p>
                     </div>
-                    <button onclick="printQR('print-zone-emp')" class="bg-blue-100 text-blue-700 font-bold px-8 py-3 rounded-full hover:bg-blue-200 flex gap-2"><i class="ph ph-printer text-xl"></i> Print Badge</button>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2 text-slate-800">Live Asset Monitor</h3>
+                    <div id="supervisor-active-list" class="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                         <p class="text-slate-400 text-sm text-center py-4">Loading assets...</p>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
 
+    <main id="view-admin" class="hidden flex-1 flex-col p-6 bg-slate-50 fade-in overflow-y-auto h-full">
+        <button onclick="promptLogout()" class="absolute top-6 right-6 text-red-600 hover:text-red-800 flex items-center gap-2 font-bold bg-red-50 px-4 py-2 rounded-xl border border-red-200 shadow-sm z-10"><i class="ph ph-sign-out text-xl"></i> Log Out Admin</button>
+        <div class="max-w-7xl mx-auto w-full">
+            <h2 class="text-3xl font-bold text-slate-800 mb-8 flex items-center gap-3"><i class="ph-fill ph-shield-check text-blue-600"></i> Administration Console</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 lg:col-span-2">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2">Register Asset Block</h3>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <input type="text" id="reg-name" placeholder="Pattern Name" class="col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                        <select id="reg-brand" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700"><option value="">Loading Brands...</option></select>
+                        <input type="text" id="reg-style" placeholder="Style String (e.g. 99X)" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                        <select id="reg-size" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700"><option value="">Loading Sizes...</option></select>
+                        <div class="flex gap-2">
+                            <select id="reg-rack-l" class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700"><option value="">Rack</option></select>
+                            <select id="reg-rack-p" class="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700">
+                                <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option>
+                            </select>
+                        </div>
+                    </div>
+                    <input type="text" id="reg-img" placeholder="Image URL (Optional)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 outline-none font-medium text-sm">
+                    <button onclick="registerAsset()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all">Generate Asset QR</button>
+                    <div id="admin-qr-output-pattern" class="mt-4 hidden flex-col items-center fade-in">
+                         <div id="print-zone-pattern" class="p-4 bg-white border-2 border-slate-800 rounded-xl inline-block text-center mb-2"><div id="qrcode-image-pattern" class="mx-auto flex justify-center bg-white"></div><p id="qr-text-pattern" class="mt-2 font-mono font-bold tracking-widest text-lg text-slate-800"></p></div>
+                         <button onclick="printQR('print-zone-pattern')" class="bg-blue-100 text-blue-700 font-bold px-6 py-2 rounded-full hover:bg-blue-200 flex gap-2"><i class="ph ph-printer text-lg"></i> Print Label</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2 flex items-center justify-between">System Parameters <i class="ph ph-faders text-slate-400"></i></h3>
+                    <div class="flex gap-2 mb-2">
+                        <select id="sys-cat" class="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium outline-none">
+                            <option value="Brand">Brand</option><option value="Size">Size</option><option value="Rack">Rack</option><option value="Role">Role</option><option value="Shift">Shift</option><option value="Department">Department</option>
+                        </select>
+                        <input type="text" id="sys-val" placeholder="Value (e.g. Gucci)" class="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium outline-none">
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="sys-prefix" placeholder="Prefix (e.g. GUC) - Brands Only" class="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none">
+                        <button onclick="addSystemSetting()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 text-sm">Add</button>
+                    </div>
+                    <div class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 overflow-y-auto max-h-48">
+                        <ul id="system-settings-list" class="space-y-1 text-sm text-slate-600 font-medium"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-lg mb-4 border-b pb-2">Register Borrower</h3>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <input type="text" id="reg-emp-name" placeholder="Operator Name" class="col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                        <select id="reg-emp-dept" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700"><option value="">Loading Depts...</option></select>
+                        <select id="reg-emp-role" class="p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium text-slate-700"><option value="">Loading Roles...</option></select>
+                        <input type="text" id="reg-emp-contact" placeholder="Contact/Ext No." class="col-span-2 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-medium">
+                    </div>
+                    <input type="text" id="reg-emp-img" placeholder="Face Image URL (Optional)" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 outline-none font-medium text-sm">
+                    <button onclick="registerOperator()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-all">Generate Badge QR</button>
+                    <div id="admin-qr-output-emp" class="mt-4 hidden flex-col items-center fade-in">
+                        <div id="print-zone-emp" class="p-4 bg-blue-50 border-2 border-blue-600 rounded-xl inline-block text-center mb-2"><div id="qrcode-image-emp" class="mx-auto flex justify-center bg-white"></div><p id="qr-text-emp" class="mt-2 font-mono font-bold text-blue-900 tracking-widest text-lg"></p></div>
+                        <button onclick="printQR('print-zone-emp')" class="bg-blue-100 text-blue-700 font-bold px-6 py-2 rounded-full hover:bg-blue-200 flex gap-2"><i class="ph ph-printer text-lg"></i> Print Badge</button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-800 flex flex-col h-full min-h-[300px]">
+                    <h3 class="font-bold text-lg mb-4 border-b border-slate-700 pb-2 text-white flex justify-between items-center">Audit Log Graveyard <i class="ph ph-terminal-window text-green-400"></i></h3>
+                    <div id="audit-log-terminal" class="flex-1 bg-black/50 rounded-xl p-4 overflow-y-auto font-mono text-[10px] text-green-400 space-y-2 border border-slate-800">
+                        <p class="text-slate-500">Connecting to server logs...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="supervisor-auth-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 text-center transform scale-95 transition-transform" id="sup-auth-content">
+            <i class="ph-fill ph-shield-star text-5xl text-amber-500 mb-2"></i><h3 class="font-bold text-xl mb-6">Supervisor Access</h3>
+            <div class="flex gap-3"><button onclick="closeModal('supervisor-auth-modal')" class="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200">Cancel</button><button onclick="executeSupervisorLogin()" class="flex-1 bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600">Authorize</button></div>
+        </div>
+    </div>
     <div id="admin-auth-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity p-4">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 text-center transform scale-95 transition-transform" id="admin-auth-content">
-            <i class="ph-fill ph-shield-warning text-5xl text-blue-600 mb-2"></i><h3 class="font-bold text-xl mb-6">Admin Authorization</h3>
-            <div class="flex gap-3"><button onclick="closeAdminAuth()" class="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200">Cancel</button><button onclick="executeAdminLogin()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">OK</button></div>
+            <i class="ph-fill ph-shield-warning text-5xl text-blue-600 mb-2"></i><h3 class="font-bold text-xl mb-6">Admin Access</h3>
+            <div class="flex gap-3"><button onclick="closeModal('admin-auth-modal')" class="flex-1 bg-slate-100 text-slate-700 font-bold py-3 rounded-xl hover:bg-slate-200">Cancel</button><button onclick="executeAdminLogin()" class="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700">Authorize</button></div>
         </div>
     </div>
     <div id="logout-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity p-4">
         <div class="bg-white w-full max-w-sm rounded-3xl p-8 text-center transform scale-95 transition-transform" id="logout-content">
-            <i class="ph-fill ph-sign-out text-5xl text-red-600 mb-4"></i><h3 class="font-bold text-2xl mb-8">Log Out Admin?</h3>
-            <div class="flex flex-col gap-3"><button onclick="executeLogout()" class="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 shadow-lg">Yes, Log Out</button><button onclick="closeLogoutModal()" class="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200">Cancel</button></div>
+            <i class="ph-fill ph-sign-out text-5xl text-red-600 mb-4"></i><h3 class="font-bold text-2xl mb-8">End Session?</h3>
+            <div class="flex flex-col gap-3"><button onclick="executeLogout()" class="w-full bg-red-600 text-white font-bold py-4 rounded-xl hover:bg-red-700 shadow-lg">Yes, Log Out</button><button onclick="closeModal('logout-modal')" class="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200">Cancel</button></div>
         </div>
     </div>
     <div id="verify-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity p-4">
-        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden transform scale-95 transition-transform" id="verify-modal-content">
-            <div class="bg-slate-900 p-4 text-white flex justify-between items-center"><h3 id="modal-title" class="font-bold tracking-wide">Verification</h3><button onclick="closeVerifyModal()" class="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-lg"><i class="ph ph-x text-xl"></i></button></div>
-            <div class="p-6 flex flex-col h-full max-h-[85vh]">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden transform scale-95 transition-transform h-[90vh] md:h-auto" id="verify-modal-content">
+            <div class="bg-slate-900 p-4 text-white flex justify-between items-center"><h3 id="modal-title" class="font-bold tracking-wide">Scanner Protocol</h3><button onclick="closeVerifyModal()" class="text-slate-400 hover:text-white bg-slate-800 p-1.5 rounded-lg"><i class="ph ph-x text-xl"></i></button></div>
+            <div class="p-6 flex flex-col h-full flex-1">
                 <div class="flex items-center justify-between mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-4 shrink-0"><div id="step-1-indicator" class="flex items-center gap-1"><i class="ph ph-circle text-lg"></i> Pattern</div><div class="flex-1 border-t border-dashed border-slate-200 mx-2"></div><div id="step-2-indicator" class="flex items-center gap-1"><i class="ph ph-circle text-lg"></i> Operator</div></div>
-                <div id="modal-dynamic-area" class="flex-1 flex flex-col justify-center items-center overflow-hidden"></div>
+                <div id="modal-dynamic-area" class="flex-1 flex flex-col justify-start items-center overflow-y-auto"></div>
             </div>
         </div>
     </div>

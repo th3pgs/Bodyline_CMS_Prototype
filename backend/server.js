@@ -144,6 +144,14 @@ app.get('/api/assignments', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/assignments', async (req, res) => {
+    try {
+        await db.query("DELETE FROM ShiftAssignments WHERE BorrowerID = ? AND AssignedDate = ? AND ShiftType = ?", 
+        [req.query.borrowerId, req.query.date, req.query.shift]);
+        res.json({ message: "Assignment Purged" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/assignments', async (req, res) => {
     try {
         // Create an assignment (Supervisor drag and drop or ticket approval)

@@ -219,12 +219,13 @@ async function selectAsset(id) {
 }
 
 // ==========================================
-// 5. SUPERVISOR CALENDAR (Drag & Drop)
+// 5. SUPERVISOR CALENDAR (Tap-to-Assign)
 // ==========================================
-function changeCalendarWeek(offset) { calendarWeekOffset += offset; loadSupervisorDashboard(); }
-
 let activeDeployments = [];
 let masterChronometer = null;
+let selectedOperatorForAssign = null; // Tracks the currently targeted operator
+
+function changeCalendarWeek(offset) { calendarWeekOffset += offset; loadSupervisorDashboard(); }
 
 async function loadSupervisorDashboard() {
     try {
@@ -234,15 +235,18 @@ async function loadSupervisorDashboard() {
         const requests = await reqsRes.json();
         const allPatterns = await patRes.json();
 
-        // 1. Unassigned Pool (Now allows infinite cloning for double shifts)
-        document.getElementById('operator-pool').innerHTML = allBorrowers.map(b => `
-            <div class="operator-card bg-black border border-neutral-800 rounded p-2 flex items-center gap-2 shadow hover:border-blue-500 cursor-grab active:cursor-grabbing active:opacity-50" draggable="true" ondragstart="dragStart(event, '${b.BorrowerID}')">
+        // 1. Unassigned Pool (Now Tap-to-Target)
+        document.getElementById('operator-pool').innerHTML = allBorrowers.map(b => {
+            const isSelected = selectedOperatorForAssign === b.BorrowerID;
+            const borderClass = isSelected ? 'border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'border-neutral-800';
+            return `
+            <div id="pool-card-${b.BorrowerID}" class="operator-card bg-black border ${borderClass} rounded p-2 flex items-center gap-2 shadow hover:border-blue-500 cursor-pointer transition-all" onclick="toggleOperatorSelection('${b.BorrowerID}')">
                 <img src="${b.ImageUrl}" class="w-8 h-8 rounded-full object-cover pointer-events-none" onerror="this.src='https://placehold.co/100?text=Face'">
                 <div class="pointer-events-none"><p class="text-[10px] font-bold text-white leading-tight">${b.FullName.split(' ')[0]}</p><p class="text-[8px] font-mono text-neutral-500">${b.BorrowerID}</p></div>
             </div>
-        `).join('') || '<p class="text-neutral-500 text-xs font-mono w-full p-2">Pool Empty</p>';
+        `}).join('') || '<p class="text-neutral-500 text-xs font-mono w-full p-2">Pool Empty</p>';
 
-        // 2. Calendar Grid with "X" Remove Buttons
+        // 2. Calendar Grid (Now Tap-to-Deploy)
         const grid = document.getElementById('calendar-grid'); grid.innerHTML = '';
         const now = new Date(); const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1 + (calendarWeekOffset * 7)));
         document.getElementById('calendar-week-label').innerText = `Week of ${startOfWeek.toLocaleDateString('en-US', {month:'short', day:'numeric'})}`;
@@ -261,11 +265,11 @@ async function loadSupervisorDashboard() {
                 const shiftKey = shiftKeys[idx];
                 const dayAssignments = assignments.filter(a => a.AssignedDate.split('T')[0] === dateStr && a.ShiftType === shiftKey);
                 colHtml += `
-                    <div class="drop-zone flex-1 bg-black rounded border border-neutral-800 border-dashed p-2 min-h-[100px] flex flex-col gap-1 transition-colors duration-200" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event, '${dateStr}', '${shiftKey}')">
-                        <p class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest mb-1 text-center">${shiftName}</p>
+                    <div class="tap-zone flex-1 bg-black rounded border border-neutral-800 border-dashed p-2 min-h-[100px] flex flex-col gap-1 transition-colors duration-200 cursor-pointer hover:bg-neutral-900 hover:border-blue-500/50" onclick="executeTapAssignment('${dateStr}', '${shiftKey}')">
+                        <p class="text-[8px] font-mono text-neutral-600 uppercase tracking-widest mb-1 text-center pointer-events-none">${shiftName}</p>
                         ${dayAssignments.map(a => { 
                             const b = allBorrowers.find(x => x.BorrowerID === a.BorrowerID); 
-                            return b ? `<div class="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-[9px] font-mono text-white flex justify-between items-center group"><div class="flex items-center gap-2"><img src="${b.ImageUrl}" class="w-4 h-4 rounded-full"> ${b.FullName.split(' ')[0]}</div> <button onclick="removeAssignment('${b.BorrowerID}', '${dateStr}', '${shiftKey}')" class="text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="ph ph-x"></i></button></div>` : ''; 
+                            return b ? `<div class="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-[9px] font-mono text-white flex justify-between items-center group"><div class="flex items-center gap-2"><img src="${b.ImageUrl}" class="w-4 h-4 rounded-full"> ${b.FullName.split(' ')[0]}</div> <button onclick="removeAssignment('${b.BorrowerID}', '${dateStr}', '${shiftKey}'); event.stopPropagation();" class="text-neutral-600 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1"><i class="ph ph-x"></i></button></div>` : ''; 
                         }).join('')}
                     </div>`;
             });
@@ -283,10 +287,9 @@ async function loadSupervisorDashboard() {
             </div>
         `).join('') || '<p class="text-neutral-500 font-mono text-[10px] text-center py-4">No active tickets.</p>';
 
-        // 4. ACTIVE DEPLOYMENT RADAR (The Timers)
+        // 4. ACTIVE DEPLOYMENT RADAR
         activeDeployments = allPatterns.filter(p => p.Status === 'Borrowed');
         const activeList = document.getElementById('supervisor-active-list');
-        
         activeList.innerHTML = activeDeployments.map(p => {
             const b = allBorrowers.find(x => x.BorrowerID === p.BorrowedBy) || { FullName: "Unknown", ImageUrl: "https://placehold.co/100" };
             return `
@@ -305,7 +308,7 @@ async function loadSupervisorDashboard() {
 
         if(masterChronometer) clearInterval(masterChronometer);
         masterChronometer = setInterval(updateActiveTimers, 1000);
-        updateActiveTimers(); // Run once instantly
+        updateActiveTimers(); 
 
     } catch (e) { showToast("Dashboard Sync Failed", "error"); }
 }
@@ -316,15 +319,11 @@ function updateActiveTimers() {
     activeDeployments.forEach(p => {
         const el = document.getElementById(`timer-${p.PatternID}`);
         if(!el) return;
-
-        // Calculate Target Shift End Time
         const target = new Date(p.CheckoutTime);
         if (p.ShiftCheckout === 'Morning') { target.setHours(14, 0, 0, 0); } 
         else if (p.ShiftCheckout === 'Afternoon') { target.setHours(22, 0, 0, 0); } 
         else if (p.ShiftCheckout === 'Night') { target.setHours(6, 0, 0, 0); target.setDate(target.getDate() + 1); }
-
         const diff = target - now;
-
         if (diff <= 0) {
             el.innerHTML = `<span class="text-red-500 animate-pulse">OVERDUE</span>`;
             el.parentElement.parentElement.classList.replace('border-neutral-800', 'border-red-900/50');
@@ -337,25 +336,47 @@ function updateActiveTimers() {
     });
 }
 
-// NEW FUNCTION: Unassign Shift
-async function removeAssignment(borrowerId, dateStr, shift) {
-    try {
-        await fetch(`${API_BASE_URL}/assignments?borrowerId=${borrowerId}&date=${dateStr}&shift=${shift}`, { method: 'DELETE' });
-        loadSupervisorDashboard(); // Instantly refresh UI
-    } catch(err) { showToast("Failed to remove", "error"); }
+// TAP-TO-ASSIGN LOGIC
+function toggleOperatorSelection(borrowerId) {
+    // Clear old visual selection instantly
+    if (selectedOperatorForAssign) {
+        const oldCard = document.getElementById(`pool-card-${selectedOperatorForAssign}`);
+        if (oldCard) {
+            oldCard.classList.replace('border-blue-500', 'border-neutral-800');
+            oldCard.classList.remove('shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+        }
+    }
+    // Toggle
+    if (selectedOperatorForAssign === borrowerId) {
+        selectedOperatorForAssign = null; // Deselected
+    } else {
+        selectedOperatorForAssign = borrowerId; // Selected
+        const newCard = document.getElementById(`pool-card-${borrowerId}`);
+        if (newCard) {
+            newCard.classList.replace('border-neutral-800', 'border-blue-500');
+            newCard.classList.add('shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+        }
+        showToast("Target Locked. Tap calendar shifts to deploy.", "success");
+    }
 }
 
-// (Keep your existing dragStart, dragOver, dragLeave, drop, and resolveTicket functions directly beneath this)
+async function executeTapAssignment(dateStr, shift) {
+    if (!selectedOperatorForAssign) return; // Do nothing if no operator is targeted
+    
+    try {
+        await fetch(`${API_BASE_URL}/assignments`, { 
+            method: 'POST', 
+            headers: {'Content-Type':'application/json'}, 
+            body: JSON.stringify({ borrowerId: selectedOperatorForAssign, date: dateStr, shift }) 
+        });
+        // We do NOT clear selectedOperatorForAssign here, allowing the manager to tap 3 different days rapidly for a single operator!
+        loadSupervisorDashboard(); 
+    } catch(err) { showToast("Deployment Failed", "error"); }
+}
 
-// Drag Handlers
-function dragStart(e, borrowerId) { e.dataTransfer.setData('text/plain', borrowerId); }
-function dragOver(e) { e.preventDefault(); e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'; e.currentTarget.style.borderColor = '#3b82f6'; }
-function dragLeave(e) { e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderColor = ''; }
-async function drop(e, dateStr, shift) {
-    e.preventDefault(); e.currentTarget.style.backgroundColor = ''; e.currentTarget.style.borderColor = '';
-    const borrowerId = e.dataTransfer.getData('text/plain'); if (!borrowerId) return;
-    try { await fetch(`${API_BASE_URL}/assignments`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ borrowerId, date: dateStr, shift }) }); loadSupervisorDashboard(); } 
-    catch(err) { showToast("Assignment Failed", "error"); }
+async function removeAssignment(borrowerId, dateStr, shift) {
+    try { await fetch(`${API_BASE_URL}/assignments?borrowerId=${borrowerId}&date=${dateStr}&shift=${shift}`, { method: 'DELETE' }); loadSupervisorDashboard(); } 
+    catch(err) { showToast("Failed to remove", "error"); }
 }
 
 async function resolveTicket(reqId, action, borrowerId, date, shift, patternId) {

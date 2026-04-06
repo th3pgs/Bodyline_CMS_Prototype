@@ -190,6 +190,14 @@ app.get('/api/patterns/exact/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/borrowers/:id', async (req, res) => {
+    try {
+        const [rows] = await db.query("SELECT * FROM Borrowers WHERE BorrowerID = ?", [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: "Operator not found" });
+        res.json(rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/patterns/borrow', async (req, res) => {
     const { patternId, borrowerId, requestedShift, requestedDate } = req.body;
     

@@ -577,3 +577,113 @@ function showSuccessScreen(title) {
 
 function clearTimerAndStay() { clearInterval(window.redirectTimer); closeVerifyModal(); selectAsset(currentAsset.PatternID); }
 function executeRedirect() { clearInterval(window.redirectTimer); closeVerifyModal(); navTo('tracker'); }
+
+// ==========================================
+// 8. MASTER LEDGER (Data Management)
+// ==========================================
+let currentLedgerView = 'patterns';
+let ledgerMemory = [];
+let editingId = null;
+
+async function loadLedger(type) {
+    currentLedgerView = type;
+    
+    // Toggle Button Styles
+    document.getElementById('btn-ledger-pat').className = type === 'patterns' ? "bg-blue-600/20 text-blue-400 border border-blue-500/50 font-mono text-[10px] px-3 py-1 rounded uppercase tracking-widest transition-colors" : "bg-transparent border border-neutral-700 text-neutral-400 font-mono text-[10px] px-3 py-1 rounded uppercase tracking-widest hover:bg-neutral-800 transition-colors";
+    document.getElementById('btn-ledger-emp').className = type === 'borrowers' ? "bg-blue-600/20 text-blue-400 border border-blue-500/50 font-mono text-[10px] px-3 py-1 rounded uppercase tracking-widest transition-colors" : "bg-transparent border border-neutral-700 text-neutral-400 font-mono text-[10px] px-3 py-1 rounded uppercase tracking-widest hover:bg-neutral-800 transition-colors";
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/${type}`);
+        ledgerMemory = await res.json();
+        
+        const thead = document.getElementById('ledger-header');
+        const tbody = document.getElementById('ledger-body');
+        
+        if (type === 'patterns') {
+            thead.innerHTML = '<th class="p-3 font-medium">ID</th><th class="p-3 font-medium">Name</th><th class="p-3 font-medium">Brand</th><th class="p-3 font-medium">Loc</th><th class="p-3 font-medium text-right">Actions</th>';
+            tbody.innerHTML = ledgerMemory.map(p => `
+                <tr class="hover:bg-neutral-900 transition-colors group">
+                    <td class="p-3 text-white">${p.PatternID}</td>
+                    <td class="p-3">${p.PatternName}</td>
+                    <td class="p-3 text-blue-400">${p.Brand}</td>
+                    <td class="p-3">${p.RackLocation}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="openEditModal('${p.PatternID}')" class="text-neutral-500 hover:text-blue-400 mr-2 opacity-0 group-hover:opacity-100"><i class="ph ph-pencil-simple text-base"></i></button>
+                        <button onclick="deleteLedgerRecord('${p.PatternID}')" class="text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><i class="ph ph-trash text-base"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            thead.innerHTML = '<th class="p-3 font-medium">ID</th><th class="p-3 font-medium">Name</th><th class="p-3 font-medium">Role</th><th class="p-3 font-medium text-right">Actions</th>';
+            tbody.innerHTML = ledgerMemory.map(b => `
+                <tr class="hover:bg-neutral-900 transition-colors group">
+                    <td class="p-3 text-white">${b.BorrowerID}</td>
+                    <td class="p-3 flex items-center gap-2"><img src="${b.ImageUrl}" class="w-6 h-6 rounded-full border border-neutral-700" onerror="this.src='https://placehold.co/100?text=Face'"> ${b.FullName}</td>
+                    <td class="p-3 text-emerald-400">${b.Role}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="openEditModal('${b.BorrowerID}')" class="text-neutral-500 hover:text-blue-400 mr-2 opacity-0 group-hover:opacity-100"><i class="ph ph-pencil-simple text-base"></i></button>
+                        <button onclick="deleteLedgerRecord('${b.BorrowerID}')" class="text-neutral-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><i class="ph ph-trash text-base"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) { showToast("Ledger Sync Failed", "error"); }
+}
+
+function openEditModal(id) {
+    editingId = id;
+    const item = ledgerMemory.find(x => x.PatternID === id || x.BorrowerID === id);
+    const form = document.getElementById('edit-modal-form');
+    
+    if (currentLedgerView === 'patterns') {
+        form.innerHTML = `
+            <input type="text" id="edit-name" value="${item.PatternName}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-brand" value="${item.Brand}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-style" value="${item.StyleNumber}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-size" value="${item.SizeCategory}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-loc" value="${item.RackLocation}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-img" value="${item.ImageUrl}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+        `;
+    } else {
+        form.innerHTML = `
+            <input type="text" id="edit-name" value="${item.FullName}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-role" value="${item.Role}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+            <input type="text" id="edit-img" value="${item.ImageUrl}" class="w-full p-3 bg-black border border-neutral-800 rounded outline-none font-mono text-sm text-white focus:border-blue-500">
+        `;
+    }
+    
+    const m = document.getElementById('edit-modal');
+    m.classList.remove('hidden'); setTimeout(() => m.classList.remove('opacity-0'), 10);
+}
+
+async function saveLedgerEdit() {
+    try {
+        if (currentLedgerView === 'patterns') {
+            const body = {
+                name: document.getElementById('edit-name').value, brand: document.getElementById('edit-brand').value,
+                style: document.getElementById('edit-style').value, size: document.getElementById('edit-size').value,
+                loc: document.getElementById('edit-loc').value, imgUrl: document.getElementById('edit-img').value
+            };
+            await fetch(`${API_BASE_URL}/patterns/${editingId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        } else {
+            const body = {
+                name: document.getElementById('edit-name').value, role: document.getElementById('edit-role').value, imgUrl: document.getElementById('edit-img').value
+            };
+            await fetch(`${API_BASE_URL}/borrowers/${editingId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        }
+        showToast("Record Updated");
+        closeModal('edit-modal');
+        loadLedger(currentLedgerView);
+        loadAuditLog(); // Refresh logs to show edit
+    } catch(e) { showToast("Update Failed", "error"); }
+}
+
+async function deleteLedgerRecord(id) {
+    if(!confirm(`Are you sure you want to permanently delete ${id}?`)) return;
+    try {
+        await fetch(`${API_BASE_URL}/${currentLedgerView}/${id}`, { method: 'DELETE' });
+        showToast("Record Purged");
+        loadLedger(currentLedgerView);
+        loadAuditLog(); // Refresh logs to show deletion
+    } catch(e) { showToast("Purge Failed", "error"); }
+}

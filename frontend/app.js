@@ -90,7 +90,8 @@ function switchAdminTab(tabName) {
     document.getElementById(`tab-btn-${tabName}`).className = "px-6 py-3 font-mono text-xs uppercase tracking-widest border-b-2 border-blue-500 text-blue-400 transition-colors";
 
     if(tabName === 'sys') loadSystemSettingsList();
-    if(tabName === 'info') loadAuditLog();
+    if(tabName === 'info') 
+        { loadAuditLog(); loadLedger('patterns'); }
     if(tabName === 'reg') fetchAndPopulateSettings();
 }
 

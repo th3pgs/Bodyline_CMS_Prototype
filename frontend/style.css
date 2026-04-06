@@ -6,21 +6,26 @@
 .custom-scroll::-webkit-scrollbar-track { background: transparent; }
 .custom-scroll::-webkit-scrollbar-thumb { background: #262626; border-radius: 4px; }
 .custom-scroll::-webkit-scrollbar-thumb:hover { background: #404040; }
-
-/* Hide default scrollbar on main containers but keep scrolling */
 ::-webkit-scrollbar { display: none; }
 
-/* NASA Grid Hover Effects */
+/* Grid Hover Effects */
 .asset-grid-card { transition: all 0.2s ease; border: 1px solid #262626; }
 .asset-grid-card:hover { border-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.15); transform: translateY(-2px); z-index: 10; }
 
-/* Camera Stream Formatting */
+/* Drag and Drop Calendar Styles */
+.operator-card { cursor: grab; transition: transform 0.1s; }
+.operator-card:active { cursor: grabbing; transform: scale(0.95); opacity: 0.8; }
+.drop-zone { transition: background-color 0.2s, border-color 0.2s; }
+.drop-zone.drag-over { background-color: rgba(59, 130, 246, 0.1); border-color: #3b82f6; border-style: solid; }
+
+/* Mutex Status Bar Animation */
+#mutex-bar:not(.hidden) { transform: translateY(0); }
+
 #camera-stream video { border-radius: 4px; object-fit: cover; width: 100%; max-height: 250px; border: 1px solid #262626; }
 
-/* THE BULLETPROOF PRINT FIX - Stripped of unnecessary styles for thermal printers */
 @media print {
     body * { visibility: hidden; }
     .print-active, .print-active * { visibility: visible !important; }
     .print-active { position: absolute; left: 0; top: 0; width: 100%; height: auto; display: flex; align-items: center; justify-content: center; padding: 2rem; background: white; border: none; }
-    #audit-log-terminal, nav, header, button { display: none !important; }
+    #audit-log-terminal, nav, header, button, #mutex-bar { display: none !important; }
 }
